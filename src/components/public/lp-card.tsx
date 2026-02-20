@@ -8,14 +8,22 @@ interface LPCardProps {
   lp: LPWithAnalysis
 }
 
+function getHostname(url: string) {
+  try {
+    return new URL(url).hostname.replace('www.', '')
+  } catch {
+    return url
+  }
+}
+
 export function LPCard({ lp }: LPCardProps) {
   const analysis = lp.lp_analyses?.[0]
 
   return (
     <Link href={`/lp/${lp.id}`} className="group block">
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md hover:border-indigo-200 transition-all duration-200">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all duration-200 hover:-translate-y-0.5">
         {/* スクリーンショット */}
-        <div className="relative aspect-[16/9] bg-gray-100 overflow-hidden">
+        <div className="relative aspect-[16/9] overflow-hidden">
           {lp.screenshot_url ? (
             <Image
               src={lp.screenshot_url}
@@ -25,10 +33,15 @@ export function LPCard({ lp }: LPCardProps) {
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-50 flex flex-col items-center justify-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-400 font-medium truncate max-w-[80%]">
+                {getHostname(lp.url)}
+              </span>
             </div>
           )}
           {/* スコアバッジ */}
@@ -39,11 +52,19 @@ export function LPCard({ lp }: LPCardProps) {
               </span>
             </div>
           )}
+          {/* 未分析バッジ */}
+          {!analysis && (
+            <div className="absolute top-2 right-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-white/80 text-gray-500 shadow-sm">
+                分析中
+              </span>
+            </div>
+          )}
         </div>
 
         {/* コンテンツ */}
         <div className="p-4">
-          <div className="flex items-start gap-2 mb-2">
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             {lp.industry && (
               <Badge variant="outline">{lp.industry}</Badge>
             )}
@@ -52,16 +73,30 @@ export function LPCard({ lp }: LPCardProps) {
             )}
           </div>
 
-          <p className="text-sm font-medium text-gray-900 line-clamp-1 mb-1">
-            {lp.title ?? new URL(lp.url).hostname}
+          <p className="text-sm font-semibold text-gray-900 line-clamp-1 mb-0.5">
+            {lp.title ?? getHostname(lp.url)}
+          </p>
+          <p className="text-xs text-gray-400 truncate mb-3">
+            {getHostname(lp.url)}
           </p>
 
-          {analysis && (
-            <div className="flex gap-3 mt-3">
+          {analysis ? (
+            <div className="flex gap-3 pt-3 border-t border-gray-100">
               <ScoreItem label="構造" score={analysis.structure_score} />
               <ScoreItem label="コピー" score={analysis.copy_score} />
               <ScoreItem label="信頼" score={analysis.trust_score} />
               <ScoreItem label="稼働" score={analysis.longevity_score} />
+            </div>
+          ) : (
+            <div className="pt-3 border-t border-gray-100">
+              <div className="flex gap-3">
+                {['構造', 'コピー', '信頼', '稼働'].map((label) => (
+                  <div key={label} className="flex flex-col items-center gap-1">
+                    <span className="text-xs text-gray-300">{label}</span>
+                    <div className="w-6 h-2 bg-gray-100 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -72,9 +107,9 @@ export function LPCard({ lp }: LPCardProps) {
 
 function ScoreItem({ label, score }: { label: string; score: number }) {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center gap-0.5">
       <span className="text-xs text-gray-400">{label}</span>
-      <span className={`text-sm font-semibold ${
+      <span className={`text-sm font-bold ${
         score >= 80 ? 'text-green-600' : score >= 60 ? 'text-yellow-600' : 'text-red-500'
       }`}>
         {score}
