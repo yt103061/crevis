@@ -1,11 +1,13 @@
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
 
-// クライアント側ではlazy初期化（ビルド時に環境変数がなくてもOK）
-let _supabase: ReturnType<typeof createClient> | null = null
+// クライアント側ではcreateClientComponentClientを使いCookieにセッションを保存する
+// （これによりサーバー側でも認証状態を読める）
+let _supabase: ReturnType<typeof createBrowserClient> | null = null
 
 export function getSupabase() {
   if (!_supabase) {
-    _supabase = createClient(
+    _supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
@@ -14,7 +16,7 @@ export function getSupabase() {
 }
 
 // クライアントコンポーネントから直接インポートできるようにProxy
-export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
   get(_target, prop) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (getSupabase() as any)[prop]
