@@ -1,0 +1,30 @@
+name: Take LP Screenshot
+
+on:
+  workflow_dispatch:
+    inputs:
+      lp_id:
+        description: 'LP ID in Supabase'
+        required: true
+      url:
+        description: 'Target URL'
+        required: true
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install puppeteer @aws-sdk/client-s3 @supabase/supabase-js
+      - name: Take screenshot and upload to R2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/screenshot.js ${{ inputs.lp_id }} "${{ inputs.url }}"
