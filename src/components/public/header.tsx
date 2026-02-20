@@ -13,9 +13,13 @@ export function Header() {
       setUser(data.session?.user ?? null)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ?? null)
-    })
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        setUser(session?.user ?? null)
+      }
+    )
 
     return () => subscription.unsubscribe()
   }, [])
@@ -26,42 +30,57 @@ export function Header() {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header
+      className="sticky top-0 z-50"
+      style={{
+        background: 'rgba(7, 7, 15, 0.82)',
+        backdropFilter: 'blur(24px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* ロゴ */}
-          <Link href="/" className="flex items-center gap-2">
-            <span className="font-bold text-indigo-600 text-xl">CreVis</span>
-            <span className="text-xs text-gray-400 hidden sm:block">成果の出るLPギャラリー</span>
+          <Link href="/" className="flex items-center gap-2.5">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            >
+              C
+            </div>
+            <span className="font-bold text-white text-lg tracking-tight">CreVis</span>
+            <span
+              className="hidden sm:inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full"
+              style={{
+                background: 'rgba(99,102,241,0.15)',
+                color: '#818cf8',
+                border: '1px solid rgba(99,102,241,0.25)',
+              }}
+            >
+              LPギャラリー
+            </span>
           </Link>
 
           {/* ナビ */}
-          <nav className="flex items-center gap-4">
-            <Link href="/search" className="text-sm text-gray-600 hover:text-gray-900">
-              検索
-            </Link>
-            <Link href="/newsletter" className="text-sm text-gray-600 hover:text-gray-900">
-              ニュースレター
-            </Link>
+          <nav className="flex items-center gap-0.5">
+            <NavLink href="/search">検索</NavLink>
+            <NavLink href="/newsletter">ニュースレター</NavLink>
             {user ? (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/dashboard"
-                  className="text-sm text-gray-600 hover:text-gray-900"
-                >
-                  コレクション
-                </Link>
+              <>
+                <NavLink href="/dashboard">コレクション</NavLink>
                 <button
                   onClick={signOut}
-                  className="text-sm text-gray-500 hover:text-gray-700"
+                  className="ml-1 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-white/5"
                 >
                   ログアウト
                 </button>
-              </div>
+              </>
             ) : (
               <Link
                 href="/login"
-                className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
+                className="ml-2 px-4 py-1.5 text-sm font-semibold text-white rounded-lg transition-opacity hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
               >
                 ログイン
               </Link>
@@ -70,5 +89,16 @@ export function Header() {
         </div>
       </div>
     </header>
+  )
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-100 rounded-lg hover:bg-white/5 transition-all"
+    >
+      {children}
+    </Link>
   )
 }

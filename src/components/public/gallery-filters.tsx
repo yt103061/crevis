@@ -48,19 +48,16 @@ export function GalleryFilters({ currentParams }: GalleryFiltersProps) {
   const currentSort = currentParams.sort ?? 'newest'
 
   return (
-    <div className="space-y-3 mb-6">
-      {/* 業界フィルター（横スクロール） */}
-      <div
-        className="flex gap-2 overflow-x-auto pb-1"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
-      >
-        <Pill
+    <div className="space-y-3 mb-8">
+      {/* 業界フィルター */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <DarkPill
           label="すべて"
           active={!currentParams.industry}
           onClick={() => updateParam('industry', '')}
         />
         {INDUSTRIES.map((i) => (
-          <Pill
+          <DarkPill
             key={i}
             label={i}
             active={currentParams.industry === i}
@@ -69,16 +66,16 @@ export function GalleryFilters({ currentParams }: GalleryFiltersProps) {
         ))}
       </div>
 
-      {/* 目的フィルター + ソート */}
+      {/* 目的 + ソート */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Pill
+        <DarkPill
           label="すべての目的"
           active={!currentParams.purpose}
           onClick={() => updateParam('purpose', '')}
           small
         />
         {PURPOSES.map((p) => (
-          <Pill
+          <DarkPill
             key={p}
             label={p}
             active={currentParams.purpose === p}
@@ -87,35 +84,31 @@ export function GalleryFilters({ currentParams }: GalleryFiltersProps) {
           />
         ))}
 
-        {/* ソート切替 */}
-        <div className="ml-auto flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 shrink-0">
-          <button
+        {/* ソートトグル */}
+        <div
+          className="ml-auto flex items-center gap-0.5 rounded-lg p-0.5 shrink-0"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <SortBtn
+            label="新着順"
+            active={currentSort !== 'score'}
             onClick={() => updateParam('sort', '')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              currentSort !== 'score'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            新着順
-          </button>
-          <button
+          />
+          <SortBtn
+            label="スコア順"
+            active={currentSort === 'score'}
             onClick={() => updateParam('sort', 'score')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              currentSort === 'score'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            スコア順
-          </button>
+          />
         </div>
       </div>
 
-      {/* アクティブフィルター表示 */}
+      {/* アクティブフィルタータグ */}
       {(currentParams.industry || currentParams.purpose) && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">絞り込み中:</span>
+          <span className="text-xs text-slate-500">絞り込み中:</span>
           {currentParams.industry && (
             <ActiveTag label={currentParams.industry} onRemove={() => updateParam('industry', '')} />
           )}
@@ -124,9 +117,9 @@ export function GalleryFilters({ currentParams }: GalleryFiltersProps) {
           )}
           <button
             onClick={() => router.push('/')}
-            className="text-xs text-gray-400 hover:text-gray-600 ml-1"
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors ml-1"
           >
-            すべてクリア
+            クリア
           </button>
         </div>
       )}
@@ -134,7 +127,7 @@ export function GalleryFilters({ currentParams }: GalleryFiltersProps) {
   )
 }
 
-function Pill({
+function DarkPill({
   label,
   active,
   onClick,
@@ -148,13 +141,52 @@ function Pill({
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 rounded-full border font-medium transition-all ${
+      className={`shrink-0 rounded-full font-medium transition-all ${
         small ? 'px-3 py-1 text-xs' : 'px-4 py-1.5 text-sm'
-      } ${
-        active
-          ? 'bg-indigo-600 text-white border-indigo-600'
-          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
       }`}
+      style={
+        active
+          ? {
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              color: '#fff',
+              border: '1px solid transparent',
+            }
+          : {
+              background: 'rgba(255,255,255,0.05)',
+              color: '#94a3b8',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }
+      }
+    >
+      {label}
+    </button>
+  )
+}
+
+function SortBtn({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
+      style={
+        active
+          ? {
+              background: 'rgba(255,255,255,0.1)',
+              color: '#f1f5f9',
+            }
+          : {
+              background: 'transparent',
+              color: '#64748b',
+            }
+      }
     >
       {label}
     </button>
@@ -163,9 +195,16 @@ function Pill({
 
 function ActiveTag({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+    <span
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium"
+      style={{
+        background: 'rgba(99,102,241,0.15)',
+        color: '#818cf8',
+        border: '1px solid rgba(99,102,241,0.25)',
+      }}
+    >
       {label}
-      <button onClick={onRemove} className="hover:text-indigo-900 leading-none ml-0.5">
+      <button onClick={onRemove} className="hover:text-white transition-colors leading-none ml-0.5">
         ×
       </button>
     </span>
