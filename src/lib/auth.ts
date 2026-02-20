@@ -23,11 +23,12 @@ export async function getSession() {
 }
 
 export async function requireAdminAuth() {
-  const session = await getSession()
+  const supabase = createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
   const adminEmail = process.env.ADMIN_EMAIL
 
-  if (!session || session.user.email !== adminEmail) {
+  if (!user || user.email !== adminEmail) {
     return null
   }
-  return session
+  return user
 }
