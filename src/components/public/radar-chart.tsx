@@ -19,17 +19,17 @@ export function RadarChart({ analysis }: RadarChartProps) {
     <div className="h-48">
       <ResponsiveContainer width="100%" height="100%">
         <RechartsRadar data={data} cx="50%" cy="50%" outerRadius="75%">
-          <PolarGrid stroke="#e5e7eb" />
+          <PolarGrid stroke="rgba(255,255,255,0.08)" />
           <PolarAngleAxis
             dataKey="subject"
-            tick={{ fontSize: 11, fill: '#6b7280' }}
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
           />
           <Radar
             name="スコア"
             dataKey="score"
-            stroke="#6366f1"
+            stroke="#818cf8"
             fill="#6366f1"
-            fillOpacity={0.2}
+            fillOpacity={0.15}
             strokeWidth={2}
           />
         </RechartsRadar>
