@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreVis — AIネイティブ LP ギャラリー＋ニュースレター
 
-## Getting Started
+日本のデザイナー・Webマーケターが「成果の出るLP」を素早く発見・参照できるプラットフォーム。
+AIによる構造分析・コピー評価・稼働期間推定で成果推定スコアを算出し、デザイン判断の根拠を提供します。
 
-First, run the development server:
+> 詳細な要件定義書は [docs/PRD.md](./docs/PRD.md) を参照してください。
+
+## 技術スタック
+
+- **Frontend/Backend:** Next.js 14 + Tailwind CSS
+- **DB + Auth:** Supabase (PostgreSQL + Auth)
+- **画像ストレージ:** Cloudflare R2
+- **AI分析:** Gemini 2.5 Flash（Phase 1）→ Claude claude-sonnet-4-20250514（Phase 2）
+- **メール配信:** Resend
+- **決済:** Stripe（Phase 2〜）
+- **デプロイ:** Vercel
+
+## セットアップ
 
 ```bash
+npm install
+cp .env.local.example .env.local
+# .env.local に必要な環境変数を設定
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+[http://localhost:3000](http://localhost:3000) でアプリが起動します。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ディレクトリ構成
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── admin/              # 管理画面
+│   ├── api/                # APIルート
+│   ├── lp/[id]/            # LP詳細ページ
+│   ├── newsletter/         # ニュースレターページ
+│   ├── search/             # 検索ページ
+│   └── page.tsx            # トップ（ギャラリー）
+├── components/             # UIコンポーネント
+├── lib/                    # ユーティリティ・クライアント
+│   ├── ai-client.ts        # AI API切替ラッパー
+│   ├── auth.ts             # 認証ヘルパー
+│   ├── r2.ts               # Cloudflare R2クライアント
+│   └── supabase.ts         # Supabaseクライアント
+└── types/                  # TypeScript型定義
+supabase/
+└── migrations/             # DBマイグレーション
+scripts/
+└── screenshot.js           # スクショ取得スクリプト（GitHub Actions用）
+docs/
+└── PRD.md                  # プロダクト要件定義書 v2.2
+```
 
-## Learn More
+## AI切替
 
-To learn more about Next.js, take a look at the following resources:
+環境変数 `AI_PROVIDER` を変更するだけで全AI処理が切り替わります。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Phase 1（デフォルト）
+AI_PROVIDER=gemini
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Phase 2（収益安定後）
+AI_PROVIDER=claude
+```
 
-## Deploy on Vercel
+## ライセンス
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private
