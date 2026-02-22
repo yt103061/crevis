@@ -52,7 +52,8 @@ create table nl_sources (
   type text,
   language text default 'en',
   active boolean default true,
-  last_fetched_at timestamptz
+  last_fetched_at timestamptz,
+  created_at timestamptz default now()
 );
 
 -- NL記事候補

@@ -29,7 +29,7 @@ async function getLPs(searchParams: SearchParams): Promise<LPWithAnalysis[]> {
     query = query.eq('purpose', searchParams.purpose)
   }
 
-  query = query.limit(24).order('created_at', { ascending: false })
+  query = query.limit(20).order('created_at', { ascending: false })
 
   const { data } = await query
   let lps = (data as LPWithAnalysis[]) ?? []
