@@ -1,12 +1,11 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') ?? '/'
 
@@ -23,24 +22,45 @@ function LoginForm() {
     setError('')
     setSuccess('')
 
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError(error.message)
-      } else {
-        router.push(redirectTo)
+    try {
+      if (mode === 'login') {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+        if (authError) {
+          setError(`ログインエラー: ${authError.message}`)
+          setLoading(false)
+          return
+        }
+        if (!data.session) {
+          setError('セッションの取得に失敗しました。メール確認が完了しているか確認してください。')
+          setLoading(false)
+          return
+        }
+        setSuccess('ログイン成功！リダイレクト中...')
+        await new Promise(r => setTimeout(r, 500))
+        window.location.href = redirectTo
+        return
       }
-    } else {
-      const { error } = await supabase.auth.signUp({
+
+      // signup
+      const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
+      if (authError) {
+        setError(`登録エラー: ${authError.message}`)
+        setLoading(false)
+        return
       }
+      if (data.session) {
+        setSuccess('登録完了！リダイレクト中...')
+        await new Promise(r => setTimeout(r, 500))
+        window.location.href = redirectTo
+        return
+      }
+      setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
+    } catch (err) {
+      setError(`予期しないエラー: ${err instanceof Error ? err.message : String(err)}`)
     }
 
     setLoading(false)
@@ -54,7 +74,7 @@ function LoginForm() {
         style={{ background: 'rgba(255,255,255,0.05)' }}
       >
         <button
-          onClick={() => setMode('login')}
+          onClick={() => { setMode('login'); setError(''); setSuccess('') }}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
             mode === 'login'
               ? 'bg-indigo-500/20 text-indigo-400 shadow-sm'
@@ -64,7 +84,7 @@ function LoginForm() {
           ログイン
         </button>
         <button
-          onClick={() => setMode('signup')}
+          onClick={() => { setMode('signup'); setError(''); setSuccess('') }}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
             mode === 'signup'
               ? 'bg-indigo-500/20 text-indigo-400 shadow-sm'
@@ -78,24 +98,24 @@ function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div
-            className="flex items-center gap-2.5 p-3 rounded-xl text-sm"
+            className="flex items-start gap-2.5 p-3 rounded-xl text-sm break-all"
             style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5' }}
           >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {error}
+            <span>{error}</span>
           </div>
         )}
         {success && (
           <div
-            className="flex items-center gap-2.5 p-3 rounded-xl text-sm"
+            className="flex items-start gap-2.5 p-3 rounded-xl text-sm"
             style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', color: '#6ee7b7' }}
           >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            {success}
+            <span>{success}</span>
           </div>
         )}
 
