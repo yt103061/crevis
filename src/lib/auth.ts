@@ -24,19 +24,29 @@ export async function getSession() {
 
 export async function requireAdminAuth() {
   const supabase = createServerSupabaseClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
   const adminEmail = process.env.ADMIN_EMAIL
 
-  if (error) {
-    console.error('[Admin Auth] getUser error:', error.message)
-  }
-  if (!user) {
-    console.error('[Admin Auth] No user found in session')
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session?.user) {
+    console.error('[Admin Auth] No session found')
     return null
   }
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    console.error('[Admin Auth] getUser failed, falling back to session user:', error?.message)
+    if (session.user.email === adminEmail) {
+      return session.user
+    }
+    return null
+  }
+
   if (user.email !== adminEmail) {
     console.error(`[Admin Auth] Email mismatch: user=${user.email}, admin=${adminEmail}`)
     return null
   }
+
   return user
 }
