@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase'
+import { SeedButton } from './seed-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,7 @@ async function getStats() {
 
 export default async function AdminDashboard() {
   const stats = await getStats()
+  const isEmpty = stats.lps === 0 && stats.pendingArticles === 0
 
   return (
     <div>
@@ -42,6 +44,18 @@ export default async function AdminDashboard() {
         <StatCard label="配信済み号数" value={stats.issues} unit="号" color="blue" />
         <StatCard label="未処理記事" value={stats.pendingArticles} unit="件" color="yellow" />
       </div>
+
+      {/* データがない場合にシードボタンを表示 */}
+      {isEmpty && (
+        <div className="mb-8 p-6 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <h2 className="font-bold text-indigo-900 mb-2">データがありません</h2>
+          <p className="text-sm text-indigo-700 mb-4">
+            サンプルLPの登録・AI分析・ニュースレターソースの登録・記事収集を自動で実行できます。
+            Gemini APIを使ってLP分析と記事翻訳を行うため、1〜2分かかります。
+          </p>
+          <SeedButton />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <QuickAction
@@ -60,7 +74,7 @@ export default async function AdminDashboard() {
 
       <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
         <h2 className="font-semibold text-gray-700 mb-2">AI設定状態</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-gray-500">AI_PROVIDER:</span>
           <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
             {process.env.AI_PROVIDER ?? 'gemini'}
