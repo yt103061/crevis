@@ -24,7 +24,7 @@ export async function getSession() {
 
 export async function requireAdminAuth() {
   const supabase = createServerSupabaseClient()
-  const adminEmail = process.env.ADMIN_EMAIL
+  const adminEmail = process.env.ADMIN_EMAIL?.trim()
 
   const { data: { session } } = await supabase.auth.getSession()
 
