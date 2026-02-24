@@ -46,3 +46,13 @@ Copy `.env.example` to `.env.local` and set at least the following for authentic
 - `ADMIN_EMAIL`
 
 If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are missing, login/signup will show a configuration error.
+
+
+### Troubleshooting: `Supabase is not configured`
+
+If login shows `Supabase is not configured`, check these in Vercel:
+
+1. Are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` set for the **same environment** you are accessing (`Production` vs `Preview`)?
+2. Did you **redeploy after adding/changing env vars**? (`NEXT_PUBLIC_*` values are embedded at build time)
+3. Open `/api/health/config` on your deployed URL and verify booleans are `true` for `requiredForLogin`.
+

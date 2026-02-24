@@ -24,7 +24,7 @@ function LoginForm() {
     setSuccess('')
 
     if (!isSupabaseBrowserConfigured()) {
-      setError('ログイン機能が未設定です。管理者に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY の設定を依頼してください。')
+      setError('ログイン機能が未設定です。Vercelの対象環境（Production/Preview）に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を設定し、再デプロイしてください。')
       setLoading(false)
       return
     }
