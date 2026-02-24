@@ -25,7 +25,8 @@ function getFeedUrls(): string[] {
     return feedsFromEnv
   }
 
-  return DEFAULT_LP_DISCOVERY_FEEDS
+  const allowDefaults = String(process.env.LP_DISCOVERY_USE_DEFAULT_FEEDS ?? 'true').toLowerCase() === 'true'
+  return allowDefaults ? DEFAULT_LP_DISCOVERY_FEEDS : []
 }
 
 function normalizeUrl(rawUrl: string): string | null {
@@ -63,6 +64,9 @@ async function isReachable(url: string): Promise<boolean> {
 
 export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const feedUrls = getFeedUrls()
+  if (!feedUrls.length) {
+    throw new Error('LP discovery feeds are empty. Set LP_DISCOVERY_FEEDS or enable LP_DISCOVERY_USE_DEFAULT_FEEDS=true')
+  }
 
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '10')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
@@ -96,7 +100,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
           .from('lps')
           .select('id')
           .eq('url', normalized)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           result.skipped++

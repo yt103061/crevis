@@ -72,8 +72,8 @@ AI_PROVIDER=claude
 
 ## 自動化設定（LP/NL）
 
-- `LP_DISCOVERY_FEEDS` を未設定にすると、推奨フィード（Product Hunt / Indie Hackers / Kickstarter / HN）を利用してLP候補を自動収集します。
-- `NL_FETCH_AUTO_SEED_SOURCES=true` の場合、ニュースレター収集時に推奨RSSソース（海外主要 + 国内）を `nl_sources` へ自動投入します。
+- `LP_DISCOVERY_FEEDS` を未設定にすると、推奨フィード（Product Hunt / Indie Hackers / Kickstarter / HN）を利用してLP候補を自動収集します（`LP_DISCOVERY_USE_DEFAULT_FEEDS=true` 時）。
+- `NL_FETCH_AUTO_SEED_SOURCES=true` の場合、ニュースレター収集時に推奨RSSソース（海外主要 + 国内）を `nl_sources` へ自動投入します（既定はアクティブソースが0件のときのみ。`NL_FETCH_AUTO_SEED_ON_EMPTY_ONLY=true`）。
 - Vercel Cron は以下を想定します。
   - `/api/cron/lp-discover` : 毎日1回
   - `/api/cron/nl-fetch` : 12時間ごと
