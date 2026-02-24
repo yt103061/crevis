@@ -12,6 +12,7 @@ export default function NLIssuesPage() {
   const [title, setTitle] = useState('')
   const [creating, setCreating] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
+  const [automating, setAutomating] = useState(false)
 
   useEffect(() => {
     fetchIssues()
@@ -41,6 +42,31 @@ export default function NLIssuesPage() {
       setShowForm(false)
       fetchIssues()
     }
+  }
+
+  async function runAutomation() {
+    setAutomating(true)
+    const res = await fetch('/api/admin/nl/automation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const data = await res.json()
+    setAutomating(false)
+
+    if (!res.ok) {
+      alert(data.error ?? '自動化実行に失敗しました')
+      return
+    }
+
+    const draftMsg = data.issueDraft?.created
+      ? `号ドラフト作成: ${data.issueDraft.articleCount}件採用`
+      : `号ドラフト作成: スキップ（${data.issueDraft?.reason ?? 'unknown'}）`
+
+    alert(
+      `自動化完了\n収集: ${data.fetchResults.processed}件追加 / ${data.fetchResults.skipped}件スキップ / ${data.fetchResults.errors}件エラー\n自動承認: ${data.autoApproved}件\n${draftMsg}`
+    )
+    fetchIssues()
   }
 
   async function updateStatus(id: string, status: string) {
@@ -84,14 +110,23 @@ export default function NLIssuesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-2 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-900">ニュースレター号管理</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-        >
-          + 号を作成
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={runAutomation}
+            disabled={automating}
+            className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {automating ? '自動化実行中...' : '自動化を実行'}
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
+          >
+            + 号を作成
+          </button>
+        </div>
       </div>
 
       {showForm && (

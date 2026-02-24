@@ -8,17 +8,20 @@ function isSupabaseEnvConfigured() {
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Edgeで環境変数不足時にMIDDLEWARE_INVOCATION_FAILEDを起こさない
-  if (!isSupabaseEnvConfigured()) {
+  // 環境変数が未設定の環境（Preview/ローカル等）では
+  // Middlewareでクラッシュさせず通常レスポンスを返す
+  if (!supabaseUrl || !supabaseAnonKey) {
     return res
   }
 
   try {
     // セッションをCookieに同期する（これがないとサーバー側でログイン状態を読めない）
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           get(name) {
@@ -38,9 +41,7 @@ export async function middleware(req: NextRequest) {
 
     await supabase.auth.getSession()
   } catch (error) {
-    console.error('middleware supabase sync failed:', error)
-    // middlewareで落とさずに画面表示を優先
-    return res
+    console.error('Middleware Supabase sync failed:', error)
   }
 
   return res

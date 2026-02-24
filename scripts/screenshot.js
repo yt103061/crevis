@@ -19,7 +19,6 @@ if (!lpId || !url) {
 async function takeScreenshot() {
   console.log(`Taking screenshot for LP ${lpId}: ${url}`)
 
-  // Puppeteerでスクリーンショット取得
   const browser = await puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -33,7 +32,6 @@ async function takeScreenshot() {
       waitUntil: 'networkidle2',
       timeout: 30000,
     })
-    // ページ全体のスクリーンショット（最大5000px）
     const bodyHeight = await page.evaluate(() =>
       Math.min(document.body.scrollHeight, 5000)
     )
@@ -47,7 +45,6 @@ async function takeScreenshot() {
     await browser.close()
   }
 
-  // R2にアップロード
   const r2 = new S3Client({
     region: 'auto',
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -67,10 +64,13 @@ async function takeScreenshot() {
     })
   )
 
-  const screenshotUrl = `https://${process.env.R2_BUCKET_NAME}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`
+  const publicUrl = process.env.R2_PUBLIC_URL
+  const screenshotUrl = publicUrl
+    ? `${publicUrl}/${key}`
+    : `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${key}`
+
   console.log(`Screenshot uploaded: ${screenshotUrl}`)
 
-  // SupabaseのLPレコードを更新
   const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY

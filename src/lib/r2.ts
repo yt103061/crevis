@@ -28,6 +28,10 @@ export async function uploadToR2(
     })
   )
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  return `${appUrl}/api/screenshots/${key}`
+  const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL
+  if (publicUrl) {
+    return `${publicUrl}/${key}`
+  }
+
+  return `https://pub-${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.dev/${key}`
 }

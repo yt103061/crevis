@@ -50,6 +50,7 @@ export interface NLSource {
   language: string
   active: boolean
   last_fetched_at: string | null
+  created_at: string
 }
 
 export interface NLArticle {
