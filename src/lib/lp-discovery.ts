@@ -28,11 +28,11 @@ function normalizeUrl(rawUrl: string): string | null {
     url.hash = ''
 
     const filtered = new URLSearchParams()
-    for (const [key, value] of url.searchParams.entries()) {
-      if (key.startsWith('utm_')) continue
-      if (key === 'fbclid' || key === 'gclid') continue
+    url.searchParams.forEach((value, key) => {
+      if (key.startsWith('utm_')) return
+      if (key === 'fbclid' || key === 'gclid') return
       filtered.append(key, value)
-    }
+    })
     url.search = filtered.toString() ? `?${filtered.toString()}` : ''
 
     return url.toString().replace(/\/$/, '')
