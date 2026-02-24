@@ -3,7 +3,7 @@
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 function LoginForm() {
   const searchParams = useSearchParams()
