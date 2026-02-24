@@ -1,0 +1,28 @@
+name: Scheduled Automation
+
+on:
+  schedule:
+    # NL article fetch: every 12 hours (UTC)
+    - cron: '0 */12 * * *'
+    # LP discovery + NL issue generation: daily 09:00 UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-cron-endpoints:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger newsletter fetch
+        run: |
+          curl -fsS -X GET "${{ secrets.APP_BASE_URL }}/api/cron/nl-fetch" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Trigger LP discovery
+        run: |
+          curl -fsS -X GET "${{ secrets.APP_BASE_URL }}/api/cron/lp-discover" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      - name: Trigger newsletter issue automation
+        run: |
+          curl -fsS -X GET "${{ secrets.APP_BASE_URL }}/api/cron/nl-issue" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

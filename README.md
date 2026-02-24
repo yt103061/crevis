@@ -45,6 +45,9 @@ Copy `.env.example` to `.env.local` and set at least the following for authentic
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_EMAIL`
 - `NEXT_PUBLIC_ADMIN_EMAIL` (optional, used to show Admin link in header after login)
+- `NL_AUTO_ARTICLE_COUNT` (optional, default: `5`)
+- `NL_AUTO_MIN_RELEVANCE` (optional, default: `70`)
+- `NL_AUTO_SEND` (optional, `true` to auto-send created issue)
 
 If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are missing, login/signup will show a configuration error.
 
@@ -67,6 +70,7 @@ If `/api/health/config` returns 404, open `/api/health` first. If both are 404, 
 This repository exposes protected cron endpoints:
 - `GET /api/cron/nl-fetch`
 - `GET /api/cron/lp-discover`
+- `GET /api/cron/nl-issue` (auto-create a ready issue from approved articles; optionally auto-send)
 
 These endpoints require `CRON_SECRET` as either:
 - `Authorization: Bearer <CRON_SECRET>`
@@ -79,6 +83,19 @@ Vercel Cron Jobs availability depends on plan/limits. If deployment fails due cr
 Example schedule recommendation:
 - NL fetch: every 12 hours
 - LP discover: daily
+
+
+### GitHub Actions scheduler (recommended)
+
+This repository includes `.github/workflows/scheduled-automation.yml`.
+Set these repository secrets to run automation without Vercel Cron:
+- `APP_BASE_URL` (e.g. `https://your-domain.com`)
+- `CRON_SECRET`
+
+The workflow triggers:
+- `/api/cron/nl-fetch`
+- `/api/cron/lp-discover`
+- `/api/cron/nl-issue`
 
 
 ### Region setting
