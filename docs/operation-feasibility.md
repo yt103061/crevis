@@ -14,7 +14,7 @@
 - `runNewsletterFetch` を共通化し、管理画面の手動実行APIとCron実行APIで再利用できるようにした。
 - `NL_FETCH_AUTO_SEED_SOURCES=true` 時に、海外主要 + 国内マーケ系の推奨RSSソースを自動投入できるようにした。
 - `/api/cron/nl-fetch` を追加し、`CRON_SECRET` で保護した定期収集エンドポイントを実装した。
-- `vercel.json` に Cron 設定を追加し、1日2回（00:00 / 12:00 UTC）で収集できる状態にした。
+- `vercel.json` に Cron 設定を追加し、Vercel Hobby 制限に合わせて1日1回で収集できる状態にした。
 
 ## 1. 現在できること（実装済み）
 

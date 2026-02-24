@@ -15,7 +15,7 @@
     },
     {
       "path": "/api/cron/nl-fetch",
-      "schedule": "0 */12 * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/nl-issue",

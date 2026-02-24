@@ -76,7 +76,7 @@ AI_PROVIDER=claude
 - `NL_FETCH_AUTO_SEED_SOURCES=true` の場合、ニュースレター収集時に推奨RSSソース（海外主要 + 国内）を `nl_sources` へ自動投入します（既定はアクティブソースが0件のときのみ。`NL_FETCH_AUTO_SEED_ON_EMPTY_ONLY=true`）。
 - Vercel Cron は以下を想定します。
   - `/api/cron/lp-discover` : 毎日1回
-  - `/api/cron/nl-fetch` : 12時間ごと
+  - `/api/cron/nl-fetch` : 毎日1回（Hobby制限対応）
   - `/api/cron/nl-issue` : 毎週木曜
 
 ## ライセンス
