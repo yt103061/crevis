@@ -39,6 +39,12 @@ function buildUnconfiguredClient() {
       async signOut() {
         return { error }
       },
+      async signInWithPassword() {
+        return { data: { user: null, session: null }, error }
+      },
+      async signUp() {
+        return { data: { user: null, session: null }, error }
+      },
       onAuthStateChange() {
         return {
           data: {

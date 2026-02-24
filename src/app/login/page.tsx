@@ -9,6 +9,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') ?? '/'
+  const callbackError = searchParams.get('error')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,33 +18,56 @@ function LoginForm() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const callbackErrorMessage =
+    callbackError === 'config_missing'
+      ? '認証設定が未完了です。管理者にお問い合わせください。'
+      : callbackError === 'auth_callback_failed'
+        ? 'メール認証の処理に失敗しました。再度ログインをお試しください。'
+        : ''
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     setSuccess('')
 
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError(error.message)
-      } else {
-        router.push(redirectTo)
-      }
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-      })
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
-      }
-    }
+    try {
+      if (mode === 'login') {
+        if (typeof supabase.auth.signInWithPassword !== 'function') {
+          setError('ログイン設定が未完了です。管理者にお問い合わせください。')
+          return
+        }
 
-    setLoading(false)
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) {
+          setError(error.message)
+        } else {
+          router.push(redirectTo)
+          router.refresh()
+        }
+      } else {
+        if (typeof supabase.auth.signUp !== 'function') {
+          setError('新規登録設定が未完了です。管理者にお問い合わせください。')
+          return
+        }
+
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        })
+        if (error) {
+          setError(error.message)
+        } else {
+          setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
+        }
+      }
+    } catch (submitError) {
+      console.error('Login submit failed:', submitError)
+      setError('ログイン処理中にエラーが発生しました。時間をおいて再度お試しください。')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -73,6 +97,11 @@ function LoginForm() {
             {error}
           </div>
         )}
+        {callbackErrorMessage && !error && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
+            {callbackErrorMessage}
+          </div>
+        )}
         {success && (
           <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
             {success}
@@ -88,7 +117,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
@@ -102,7 +131,7 @@ function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
