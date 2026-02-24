@@ -3,7 +3,7 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
 
 function LoginForm() {
   const router = useRouter()
@@ -23,24 +23,34 @@ function LoginForm() {
     setError('')
     setSuccess('')
 
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError(error.message)
+    if (!isSupabaseBrowserConfigured()) {
+      setError('ログイン機能が未設定です。管理者に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY の設定を依頼してください。')
+      setLoading(false)
+      return
+    }
+
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) {
+          setError(error.message)
+        } else {
+          router.push(redirectTo)
+        }
       } else {
-        router.push(redirectTo)
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        })
+        if (error) {
+          setError(error.message)
+        } else {
+          setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
+        }
       }
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-      })
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
-      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ログイン処理に失敗しました')
     }
 
     setLoading(false)
