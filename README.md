@@ -53,8 +53,9 @@ If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are missing, log
 If login shows `Supabase is not configured`, check these in Vercel:
 
 1. Are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` set for the **same environment** you are accessing (`Production` vs `Preview`)?
-2. Did you **redeploy after adding/changing env vars**? (`NEXT_PUBLIC_*` values are embedded at build time)
+2. If the variable says `All Environments` now, did you redeploy the Preview after saving it? (`NEXT_PUBLIC_*` values are embedded at build time, so old Preview builds keep old values)
 3. Open `/api/health/config` on your deployed URL and verify booleans are `true` for `requiredForLogin`.
+4. Check `env.vercelEnv` in `/api/health/config` and ensure you are looking at the intended deployment scope.
 
 
 If `/api/health/config` returns 404, open `/api/health` first. If both are 404, redeploy from the latest commit (the deployment is likely outdated).

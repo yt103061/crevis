@@ -9,12 +9,15 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') ?? '/'
+  const initialError = searchParams.get('error') === 'supabase-not-configured'
+    ? 'このデプロイ環境ではSupabase環境変数が不足しています。VercelのPreview環境に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を追加し、再デプロイしてください。'
+    : ''
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError)
   const [success, setSuccess] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -75,6 +78,10 @@ function LoginForm() {
         >
           新規登録
         </button>
+      </div>
+
+      <div className="mb-3 text-xs text-gray-500">
+        環境変数確認: <code className="px-1 py-0.5 bg-gray-100 rounded">/api/health/config</code>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
