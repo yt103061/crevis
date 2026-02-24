@@ -58,3 +58,23 @@ If login shows `Supabase is not configured`, check these in Vercel:
 
 
 If `/api/health/config` returns 404, open `/api/health` first. If both are 404, redeploy from the latest commit (the deployment is likely outdated).
+
+
+## Scheduled Jobs (NL fetch / LP discovery)
+
+This repository exposes protected cron endpoints:
+- `GET /api/cron/nl-fetch`
+- `GET /api/cron/lp-discover`
+
+These endpoints require `CRON_SECRET` as either:
+- `Authorization: Bearer <CRON_SECRET>`
+- `?token=<CRON_SECRET>`
+
+### Important for Vercel deployment
+
+Vercel Cron Jobs availability depends on plan/limits. If deployment fails due cron settings, keep `vercel.json` without a `crons` block and trigger these endpoints from an external scheduler (e.g. GitHub Actions, UptimeRobot, cron-job.org).
+
+Example schedule recommendation:
+- NL fetch: every 12 hours
+- LP discover: daily
+
