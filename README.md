@@ -78,3 +78,11 @@ Example schedule recommendation:
 - NL fetch: every 12 hours
 - LP discover: daily
 
+
+### Region setting
+
+This repository pins Vercel Functions to Tokyo with `"regions": ["nrt1"]` in `vercel.json`.
+
+If your project still runs in another region, also check Vercel Project Settings (Functions/Regions) and redeploy.
+You can verify runtime region from `/api/health` or `/api/health/config` via `env.vercelRegion`.
+

@@ -25,3 +25,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 400 })
   }
 }
+
+export const preferredRegion = 'nrt1'

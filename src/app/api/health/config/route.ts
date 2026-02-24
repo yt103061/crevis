@@ -8,6 +8,7 @@ export async function GET() {
   return NextResponse.json({
     env: {
       vercelEnv: process.env.VERCEL_ENV ?? 'unknown',
+      vercelRegion: process.env.VERCEL_REGION ?? 'unknown',
       nodeEnv: process.env.NODE_ENV ?? 'unknown',
     },
     requiredForLogin: {
@@ -22,3 +23,5 @@ export async function GET() {
     note: 'Values are never returned. Only presence booleans are exposed for diagnostics.',
   })
 }
+
+export const preferredRegion = 'nrt1'
