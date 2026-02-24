@@ -29,6 +29,28 @@ function buildUnconfiguredClient() {
   )
 
   return {
+    auth: {
+      async getSession() {
+        return { data: { session: null }, error }
+      },
+      async getUser() {
+        return { data: { user: null }, error }
+      },
+      async signOut() {
+        return { error }
+      },
+      onAuthStateChange() {
+        return {
+          data: {
+            subscription: {
+              unsubscribe() {
+                // no-op
+              },
+            },
+          },
+        }
+      },
+    },
     from() {
       return chain
     },
