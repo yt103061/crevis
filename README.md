@@ -81,8 +81,10 @@ Example schedule recommendation:
 
 ### Region setting
 
-This repository pins Vercel Functions to Tokyo with `"regions": ["nrt1"]` in `vercel.json`.
+This repository pins Vercel Functions to Tokyo with `"regions": ["hnd1"]` in `vercel.json` (Vercel region code for Tokyo).
 
 If your project still runs in another region, also check Vercel Project Settings (Functions/Regions) and redeploy.
 You can verify runtime region from `/api/health` or `/api/health/config` via `env.vercelRegion`.
 
+
+If deployment still fails with `Invalid region`, remove the `regions` field from `vercel.json` and redeploy (project/plan constraints may restrict region pinning).

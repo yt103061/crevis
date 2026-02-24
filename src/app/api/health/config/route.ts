@@ -24,4 +24,4 @@ export async function GET() {
   })
 }
 
-export const preferredRegion = 'nrt1'
+export const preferredRegion = 'hnd1'
