@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase'
 import { processNewsletterArticle } from '@/lib/ai-client'
 import RSSParser from 'rss-parser'
+import { DEFAULT_NL_SOURCES } from '@/lib/automation/default-feeds'
 
 const parser = new RSSParser({
   timeout: 10000,
@@ -12,7 +13,34 @@ export interface NewsletterFetchResult {
   errors: number
 }
 
+
+
+async function ensureDefaultSources() {
+  const supabase = createServiceClient({ requireServiceRole: true })
+
+  const { data: existingSources } = await supabase
+    .from('nl_sources')
+    .select('id, url, active')
+
+  const byUrl = new Map((existingSources ?? []).map((s) => [s.url, s]))
+
+  for (const source of DEFAULT_NL_SOURCES) {
+    if (byUrl.has(source.url)) continue
+
+    await supabase.from('nl_sources').insert({
+      name: source.name,
+      url: source.url,
+      type: 'rss',
+      language: source.name.match(/[ぁ-んァ-ヶ一-龥]/) ? 'ja' : 'en',
+      active: true,
+    })
+  }
+}
+
 export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
+  const autoSeed = String(process.env.NL_FETCH_AUTO_SEED_SOURCES ?? 'true').toLowerCase() === 'true'
+  if (autoSeed) await ensureDefaultSources()
+
   const supabase = createServiceClient({ requireServiceRole: true })
 
   const { data: sources, error: sourcesError } = await supabase

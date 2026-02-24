@@ -1,6 +1,7 @@
 import RSSParser from 'rss-parser'
 import { analyzeLP } from '@/lib/ai-client'
 import { createServiceClient } from '@/lib/supabase'
+import { DEFAULT_LP_DISCOVERY_FEEDS } from '@/lib/automation/default-feeds'
 
 const parser = new RSSParser({ timeout: 10000 })
 
@@ -15,10 +16,16 @@ export interface LPDiscoveryResult {
 
 function getFeedUrls(): string[] {
   const raw = process.env.LP_DISCOVERY_FEEDS ?? ''
-  return raw
+  const feedsFromEnv = raw
     .split(',')
     .map((url) => url.trim())
     .filter((url) => !!url)
+
+  if (feedsFromEnv.length > 0) {
+    return feedsFromEnv
+  }
+
+  return DEFAULT_LP_DISCOVERY_FEEDS
 }
 
 function normalizeUrl(rawUrl: string): string | null {
@@ -56,9 +63,6 @@ async function isReachable(url: string): Promise<boolean> {
 
 export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const feedUrls = getFeedUrls()
-  if (!feedUrls.length) {
-    throw new Error('LP_DISCOVERY_FEEDS is empty')
-  }
 
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '10')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
