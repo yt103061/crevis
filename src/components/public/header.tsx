@@ -3,12 +3,16 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
 
 export function Header() {
   const [user, setUser] = useState<{ email?: string } | null>(null)
 
   useEffect(() => {
+    if (!isSupabaseBrowserConfigured()) {
+      return
+    }
+
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       setUser(data.session?.user ?? null)
     })
@@ -25,6 +29,10 @@ export function Header() {
   }, [])
 
   async function signOut() {
+    if (!isSupabaseBrowserConfigured()) {
+      return
+    }
+
     await supabase.auth.signOut()
     setUser(null)
   }

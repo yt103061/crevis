@@ -20,7 +20,7 @@ let _supabase: ReturnType<typeof createBrowserClient> | null = null
 export function getSupabase() {
   if (!isSupabaseBrowserConfigured()) {
     throw new Error(
-      'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+      'Supabase is not configured for this deployment environment. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in the current Vercel environment (Production/Preview/Development) and redeploy.'
     )
   }
 
@@ -43,7 +43,7 @@ export function createServiceClient(options?: { requireServiceRole?: boolean }) 
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(
-      'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+      'Supabase is not configured for this deployment environment. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in the current Vercel environment (Production/Preview/Development) and redeploy.'
     )
   }
 
