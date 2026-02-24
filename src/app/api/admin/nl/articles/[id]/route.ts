@@ -18,7 +18,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
   const { data, error } = await supabase
     .from('nl_articles')
     .update({ status })

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   // 号番号を自動採番
   const { data: lastIssue } = await supabase

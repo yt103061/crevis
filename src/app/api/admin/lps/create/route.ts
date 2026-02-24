@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
+    const supabase = createServiceClient({ requireServiceRole: true })
 
     // LP登録
     const { data: lp, error: lpError } = await supabase

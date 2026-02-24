@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '有効なメールアドレスを入力してください' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   // 既存チェック（退会済みなら再登録）
   const { data: existing } = await supabase

@@ -3,12 +3,18 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
 
 export function Header() {
   const [user, setUser] = useState<{ email?: string } | null>(null)
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase()
+  const isAdmin = !!user?.email && !!adminEmail && user.email.toLowerCase() === adminEmail
 
   useEffect(() => {
+    if (!isSupabaseBrowserConfigured()) {
+      return
+    }
+
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       setUser(data.session?.user ?? null)
     })
@@ -25,6 +31,10 @@ export function Header() {
   }, [])
 
   async function signOut() {
+    if (!isSupabaseBrowserConfigured()) {
+      return
+    }
+
     await supabase.auth.signOut()
     setUser(null)
   }
@@ -69,6 +79,7 @@ export function Header() {
             {user ? (
               <>
                 <NavLink href="/dashboard">コレクション</NavLink>
+                {isAdmin && <NavLink href="/admin">管理画面</NavLink>}
                 <button
                   onClick={signOut}
                   className="ml-1 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-white/5"

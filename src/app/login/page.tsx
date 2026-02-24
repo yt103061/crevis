@@ -3,18 +3,21 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
 
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') ?? '/'
+  const initialError = searchParams.get('error') === 'supabase-not-configured'
+    ? 'このデプロイ環境ではSupabase環境変数が不足しています。VercelのPreview環境に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を追加し、再デプロイしてください。'
+    : ''
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError)
   const [success, setSuccess] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -23,31 +26,41 @@ function LoginForm() {
     setError('')
     setSuccess('')
 
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError(error.message)
+    if (!isSupabaseBrowserConfigured()) {
+      setError('ログイン機能が未設定です。Vercelの対象環境（Production/Preview）に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を設定し、再デプロイしてください。')
+      setLoading(false)
+      return
+    }
+
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) {
+          setError(error.message)
+        } else {
+          router.push(redirectTo)
+        }
       } else {
-        router.push(redirectTo)
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        })
+        if (error) {
+          setError(error.message)
+        } else {
+          setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
+        }
       }
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-      })
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess('確認メールを送信しました。メールのリンクをクリックして登録を完了してください。')
-      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ログイン処理に失敗しました')
     }
 
     setLoading(false)
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <div className="bg-white text-gray-900 rounded-xl border border-gray-200 p-6 shadow-sm">
       <div className="flex gap-0 mb-6 bg-gray-100 rounded-lg p-0.5">
         <button
           onClick={() => setMode('login')}
@@ -65,6 +78,10 @@ function LoginForm() {
         >
           新規登録
         </button>
+      </div>
+
+      <div className="mb-3 text-xs text-gray-500">
+        環境変数確認: <code className="px-1 py-0.5 bg-gray-100 rounded">/api/health/config</code>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -88,7 +105,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
@@ -102,7 +119,7 @@ function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full bg-white text-gray-900 border border-gray-300 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 

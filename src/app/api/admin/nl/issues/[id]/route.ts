@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { requireAdminAuth } from '@/lib/auth'
-import { Resend } from 'resend'
+import { sendIssue } from '@/lib/newsletter/issue-automation'
 
 export async function PATCH(
   request: NextRequest,
@@ -14,73 +14,17 @@ export async function PATCH(
 
   const body = await request.json()
   const { action, ...fields } = body
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   if (action === 'send') {
-    // メール配信
-    const { data: issue } = await supabase
-      .from('newsletter_issues')
-      .select('*')
-      .eq('id', params.id)
-      .single()
-
-    if (!issue) {
-      return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
+    try {
+      const result = await sendIssue(params.id)
+      return NextResponse.json({ sentCount: result.sentCount, alreadySent: result.alreadySent })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Send failed'
+      const status = message === 'Issue not found' ? 404 : message === 'No subscribers' ? 400 : 500
+      return NextResponse.json({ error: message }, { status })
     }
-
-    if (issue.status === 'sent') {
-      return NextResponse.json({ error: 'Already sent' }, { status: 400 })
-    }
-
-    // アクティブな購読者を取得
-    const { data: subscribers } = await supabase
-      .from('newsletter_subscribers')
-      .select('email')
-      .is('unsubscribed_at', null)
-
-    if (!subscribers?.length) {
-      return NextResponse.json({ error: 'No subscribers' }, { status: 400 })
-    }
-
-    const resend = new Resend(process.env.RESEND_API_KEY)
-    const fromEmail = process.env.RESEND_FROM_EMAIL!
-
-    let sentCount = 0
-    // バッチ送信（100件ずつ）
-    for (let i = 0; i < subscribers.length; i += 100) {
-      const batch = subscribers.slice(i, i + 100)
-      try {
-        await resend.batch.send(
-          batch.map((sub) => ({
-            from: fromEmail,
-            to: sub.email,
-            subject: `[CreVis] ${issue.title}`,
-            html: issue.content_html ?? '',
-          }))
-        )
-        sentCount += batch.length
-      } catch (sendError) {
-        console.error('Batch send error:', sendError)
-      }
-    }
-
-    // ステータス更新
-    const { data, error } = await supabase
-      .from('newsletter_issues')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        recipient_count: sentCount,
-      })
-      .eq('id', params.id)
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ issue: data, sentCount })
   }
 
   // 通常の更新

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/auth'
-import { runNewsletterFetch } from '@/lib/newsletter/fetch'
+import { runLPDiscovery } from '@/lib/lp-discovery'
 
 export async function POST() {
   const session = await requireAdminAuth()
@@ -9,10 +9,10 @@ export async function POST() {
   }
 
   try {
-    const results = await runNewsletterFetch()
+    const results = await runLPDiscovery()
     return NextResponse.json({ results })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Fetch failed'
+    const message = error instanceof Error ? error.message : 'Discovery failed'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }
