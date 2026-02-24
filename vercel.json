@@ -3,5 +3,15 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "regions": ["nrt1"]
+  "regions": ["nrt1"],
+  "crons": [
+    {
+      "path": "/api/cron/nl-fetch",
+      "schedule": "0 0,12 * * *"
+    },
+    {
+      "path": "/api/cron/lp-discover",
+      "schedule": "30 1 * * *"
+    }
+  ]
 }
