@@ -44,6 +44,7 @@ Copy `.env.example` to `.env.local` and set at least the following for authentic
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_EMAIL`
+- `NEXT_PUBLIC_ADMIN_EMAIL` (optional, used to show Admin link in header after login)
 
 If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are missing, login/signup will show a configuration error.
 

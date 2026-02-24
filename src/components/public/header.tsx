@@ -7,6 +7,8 @@ import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
 
 export function Header() {
   const [user, setUser] = useState<{ email?: string } | null>(null)
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.trim().toLowerCase()
+  const isAdmin = !!user?.email && !!adminEmail && user.email.toLowerCase() === adminEmail
 
   useEffect(() => {
     if (!isSupabaseBrowserConfigured()) {
@@ -77,6 +79,7 @@ export function Header() {
             {user ? (
               <>
                 <NavLink href="/dashboard">コレクション</NavLink>
+                {isAdmin && <NavLink href="/admin">管理画面</NavLink>}
                 <button
                   onClick={signOut}
                   className="ml-1 px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-white/5"
