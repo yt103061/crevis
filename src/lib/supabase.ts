@@ -9,6 +9,10 @@ export function isSupabaseBrowserConfigured() {
   return !!SUPABASE_URL && !!SUPABASE_ANON_KEY
 }
 
+export function isSupabaseServiceConfigured() {
+  return !!SUPABASE_URL && !!SUPABASE_SERVICE_ROLE_KEY
+}
+
 // クライアント側ではcreateClientComponentClientを使いCookieにセッションを保存する
 // （これによりサーバー側でも認証状態を読める）
 let _supabase: ReturnType<typeof createBrowserClient> | null = null
@@ -34,14 +38,32 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
   },
 })
 
-export function createServiceClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+export function createServiceClient(options?: { requireServiceRole?: boolean }) {
+  const requireServiceRole = options?.requireServiceRole ?? false
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(
-      'Supabase service client is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+      'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
     )
   }
 
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  if (SUPABASE_SERVICE_ROLE_KEY) {
+    return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+
+  if (requireServiceRole) {
+    throw new Error(
+      'Supabase service client is not configured. Set SUPABASE_SERVICE_ROLE_KEY for admin/cron operations.'
+    )
+  }
+
+  // フロント表示を止めないため、service role未設定時はanonキーでフォールバック
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

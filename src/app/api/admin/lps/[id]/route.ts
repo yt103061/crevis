@@ -12,7 +12,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
   const body = await request.json()
   const { action, ...fields } = body
 
@@ -76,7 +76,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
   const { error } = await supabase.from('lps').delete().eq('id', params.id)
 
   if (error) {

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'lp_id is required' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   const { data, error } = await supabase
     .from('collections')
@@ -46,7 +46,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'lp_id is required' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   const { error } = await supabase
     .from('collections')

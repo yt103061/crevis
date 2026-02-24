@@ -14,7 +14,7 @@ export async function PATCH(
 
   const body = await request.json()
   const { action, ...fields } = body
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   if (action === 'send') {
     // メール配信

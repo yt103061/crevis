@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
   const { data, error } = await supabase
     .from('nl_sources')
     .select('*')
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Name and URL are required' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
   const { data, error } = await supabase
     .from('nl_sources')
     .insert({ name, url, type: type ?? 'rss', language: language ?? 'en' })

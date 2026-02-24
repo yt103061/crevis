@@ -13,7 +13,7 @@ export interface NewsletterFetchResult {
 }
 
 export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   const { data: sources, error: sourcesError } = await supabase
     .from('nl_sources')

@@ -12,7 +12,7 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   const { data, error } = await supabase
     .from('nl_sources')
@@ -37,7 +37,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createServiceClient({ requireServiceRole: true })
   const { error } = await supabase.from('nl_sources').delete().eq('id', params.id)
 
   if (error) {
