@@ -1,11 +1,12 @@
 import { createServiceClient } from '@/lib/supabase'
+import { SeedButton } from './seed-button'
 
 export const dynamic = 'force-dynamic'
 
 async function getStats() {
   const supabase = createServiceClient()
 
-  const [lpCount, subscriberCount, issueCount, articleCount] = await Promise.all([
+  const [lpCount, subscriberCount, issueCount, articleCount, proCount, teamCount, totalUsers] = await Promise.all([
     supabase.from('lps').select('id', { count: 'exact', head: true }).eq('status', 'active'),
     supabase
       .from('newsletter_subscribers')
@@ -19,29 +20,69 @@ async function getStats() {
       .from('nl_articles')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending'),
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('plan', 'pro'),
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('plan', 'team'),
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true }),
   ])
+
+  const proUsers = proCount.count ?? 0
+  const teamUsers = teamCount.count ?? 0
+  const mrr = proUsers * 980 + teamUsers * 2980
 
   return {
     lps: lpCount.count ?? 0,
     subscribers: subscriberCount.count ?? 0,
     issues: issueCount.count ?? 0,
     pendingArticles: articleCount.count ?? 0,
+    proUsers,
+    teamUsers,
+    totalUsers: totalUsers.count ?? 0,
+    mrr,
   }
 }
 
 export default async function AdminDashboard() {
   const stats = await getStats()
+  const isEmpty = stats.lps === 0 && stats.pendingArticles === 0
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">ダッシュボード</h1>
 
+      {/* MRR & ユーザー */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <StatCard label="MRR" value={stats.mrr} unit="円" color="indigo" prefix="¥" />
+        <StatCard label="総ユーザー" value={stats.totalUsers} unit="人" color="blue" />
+        <StatCard label="Pro" value={stats.proUsers} unit="人" color="green" />
+        <StatCard label="Team" value={stats.teamUsers} unit="人" color="green" />
+      </div>
+
+      {/* コンテンツ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="登録LP数" value={stats.lps} unit="件" color="indigo" />
         <StatCard label="NL購読者" value={stats.subscribers} unit="人" color="green" />
         <StatCard label="配信済み号数" value={stats.issues} unit="号" color="blue" />
         <StatCard label="未処理記事" value={stats.pendingArticles} unit="件" color="yellow" />
       </div>
+
+      {isEmpty && (
+        <div className="mb-8 p-6 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <h2 className="font-bold text-indigo-900 mb-2">データがありません</h2>
+          <p className="text-sm text-indigo-700 mb-4">
+            サンプルLPの登録・AI分析・ニュースレターソースの登録・記事収集を自動で実行できます。
+            Gemini APIを使ってLP分析と記事翻訳を行うため、1〜2分かかります。
+          </p>
+          <SeedButton />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <QuickAction
@@ -60,7 +101,7 @@ export default async function AdminDashboard() {
 
       <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
         <h2 className="font-semibold text-gray-700 mb-2">AI設定状態</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm text-gray-500">AI_PROVIDER:</span>
           <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
             {process.env.AI_PROVIDER ?? 'gemini'}
@@ -81,11 +122,13 @@ function StatCard({
   value,
   unit,
   color,
+  prefix,
 }: {
   label: string
   value: number
   unit: string
   color: 'indigo' | 'green' | 'blue' | 'yellow'
+  prefix?: string
 }) {
   const colors = {
     indigo: 'bg-indigo-50 text-indigo-600 border-indigo-200',
@@ -97,9 +140,9 @@ function StatCard({
   return (
     <div className={`p-4 rounded-lg border ${colors[color]} bg-white`}>
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-3xl font-bold mt-1">
-        {value}
-        <span className="text-base font-normal text-gray-400 ml-1">{unit}</span>
+      <p className="text-2xl sm:text-3xl font-bold mt-1">
+        {prefix}{value.toLocaleString()}
+        <span className="text-sm font-normal text-gray-400 ml-1">{unit}</span>
       </p>
     </div>
   )

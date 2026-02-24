@@ -8,11 +8,14 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: '**.r2.dev',
+      },
+      {
+        protocol: 'https',
         hostname: '**.cloudflare.com',
       },
     ],
   },
-  // 管理画面のデプロイ時はNoIndex
   async headers() {
     return [
       {

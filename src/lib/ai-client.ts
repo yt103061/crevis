@@ -1,13 +1,27 @@
 import type { LPAnalysisInput, LPAnalysisOutput, ArticleInput, ArticleOutput } from '@/types'
+import { generateEmbedding } from '@/lib/embedding'
 
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini' // 'gemini' | 'claude'
 
-export async function analyzeLP(input: LPAnalysisInput): Promise<LPAnalysisOutput> {
+export interface LPAnalysisWithEmbedding extends LPAnalysisOutput {
+  embedding?: number[]
+}
+
+export async function analyzeLP(input: LPAnalysisInput): Promise<LPAnalysisWithEmbedding> {
   const prompt = buildLPAnalysisPrompt(input)
   const raw = AI_PROVIDER === 'claude'
     ? await callClaude(prompt)
     : await callGemini(prompt)
-  return extractJSON(raw) as LPAnalysisOutput
+  const result = extractJSON(raw) as LPAnalysisWithEmbedding
+
+  try {
+    const embeddingText = `${input.industry} ${input.purpose} ${input.target_audience} ${result.good_points?.join(' ')} ${result.why_it_works}`
+    result.embedding = await generateEmbedding(embeddingText)
+  } catch (err) {
+    console.error('Embedding generation failed:', err)
+  }
+
+  return result
 }
 
 export async function processNewsletterArticle(

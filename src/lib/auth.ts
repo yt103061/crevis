@@ -40,11 +40,29 @@ export async function requireAdminAuth() {
     return null
   }
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const adminEmail = process.env.ADMIN_EMAIL
+  const adminEmail = process.env.ADMIN_EMAIL?.trim()
 
-  if (!user || user.email !== adminEmail) {
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session?.user) {
+    console.error('[Admin Auth] No session found')
     return null
   }
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    console.error('[Admin Auth] getUser failed, falling back to session user:', error?.message)
+    if (session.user.email === adminEmail) {
+      return session.user
+    }
+    return null
+  }
+
+  if (user.email !== adminEmail) {
+    console.error(`[Admin Auth] Email mismatch: user=${user.email}, admin=${adminEmail}`)
+    return null
+  }
+
   return user
 }
