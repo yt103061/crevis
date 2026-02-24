@@ -98,6 +98,7 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
   },
 })
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function createServiceClient(_options?: { requireServiceRole?: boolean }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
