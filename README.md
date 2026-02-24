@@ -56,3 +56,5 @@ If login shows `Supabase is not configured`, check these in Vercel:
 2. Did you **redeploy after adding/changing env vars**? (`NEXT_PUBLIC_*` values are embedded at build time)
 3. Open `/api/health/config` on your deployed URL and verify booleans are `true` for `requiredForLogin`.
 
+
+If `/api/health/config` returns 404, open `/api/health` first. If both are 404, redeploy from the latest commit (the deployment is likely outdated).
