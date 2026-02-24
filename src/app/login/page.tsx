@@ -8,16 +8,21 @@ import { isSupabaseBrowserConfigured, supabase } from '@/lib/supabase'
 function LoginForm() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') ?? '/'
-  const initialError = searchParams.get('error') === 'supabase-not-configured'
-    ? 'このデプロイ環境ではSupabase環境変数が不足しています。VercelのPreview環境に NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を追加し、再デプロイしてください。'
-    : ''
+  const callbackError = searchParams.get('error')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(initialError)
+  const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  const callbackErrorMessage =
+    callbackError === 'config_missing'
+      ? '認証設定が未完了です。管理者にお問い合わせください。'
+      : callbackError === 'auth_callback_failed'
+        ? 'メール認証の処理に失敗しました。再度ログインをお試しください。'
+        : ''
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -112,6 +117,11 @@ function LoginForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>{error}</span>
+          </div>
+        )}
+        {callbackErrorMessage && !error && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
+            {callbackErrorMessage}
           </div>
         )}
         {success && (

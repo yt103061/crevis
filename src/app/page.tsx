@@ -126,6 +126,55 @@ export default async function HomePage({
           </div>
         </div>
 
+        <section className="mb-10">
+          <div
+            className="rounded-2xl p-5 sm:p-6"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <h2 className="text-sm sm:text-base font-bold text-white">迷わない使い方（3ステップ）</h2>
+              <span className="text-xs text-slate-500">初見でも2分でキャッチアップ</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  step: '01',
+                  title: '業界・目的で絞り込む',
+                  body: 'まずは自社に近い業界と目的で候補を絞ります。',
+                },
+                {
+                  step: '02',
+                  title: '4軸スコアを比較する',
+                  body: '構造・コピー・信頼・稼働を横並びで評価します。',
+                },
+                {
+                  step: '03',
+                  title: '参考LPを保存して運用へ',
+                  body: '気になったLPをブックマークして改善案の土台に。',
+                },
+              ].map((item) => (
+                <div
+                  key={item.step}
+                  className="rounded-xl p-4"
+                  style={{
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                  }}
+                >
+                  <p className="text-xs font-bold mb-2" style={{ color: '#818cf8' }}>
+                    STEP {item.step}
+                  </p>
+                  <p className="text-sm font-semibold text-white mb-1.5">{item.title}</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">{item.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Filters */}
         <Suspense>
           <GalleryFilters currentParams={searchParams} />

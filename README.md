@@ -52,6 +52,11 @@ docs/
 └── PRD.md                  # プロダクト要件定義書 v2.2
 ```
 
+## Roadmap
+
+- 自動化ロードマップ提案（ニュースレター完全自動化 / LP自動収集）:
+  - `docs/automation-phase-plan.md`
+
 ## AI切替
 
 環境変数 `AI_PROVIDER` を変更するだけで全AI処理が切り替わります。
