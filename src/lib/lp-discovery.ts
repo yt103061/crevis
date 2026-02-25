@@ -136,17 +136,25 @@ function heuristicScore(candidate: Candidate): number {
 
 /**
  * B3: LP候補のHTMLを取得し、「本当にLPか」スコアを算出する。
- * フォーム・CTA要素を加点、ブログ記事的なシグナルを減点。
- * スコアが低い候補はAI分析前にスキップし、AI呼び出しコストと精度を最適化する。
+ *
+ * 判定の考え方:
+ * - LPの必要条件: フォーム要素（資料請求・申し込みフォーム等）が存在する
+ *   → hasHardLpSignal が false かつ CTA が少ない場合は LP と見なさない
+ * - ニュース・ブログ記事の特徴: <article>+<time>、リンク密度が高い
+ *   → これらのシグナルで減点
  */
 function scoreLpHtml(html: string): number {
   let score = 0
   const lower = html.toLowerCase()
 
-  // フォーム・入力要素（高スコア）
-  if (/<form[\s>]/i.test(html)) score += 30
-  if (/<input[^>]+type=["']email["']/i.test(html)) score += 20
-  if (/<input[^>]+type=["']submit["']/i.test(html)) score += 15
+  // フォーム・入力要素（強いLPシグナル）
+  const hasForm = /<form[\s>]/i.test(html)
+  const hasEmailInput = /<input[^>]+type=["']email["']/i.test(html)
+  const hasSubmitInput = /<input[^>]+type=["']submit["']/i.test(html)
+
+  if (hasForm) score += 30
+  if (hasEmailInput) score += 20
+  if (hasSubmitInput) score += 15
 
   // CTA系キーワード
   const ctaKeywords = [
@@ -154,12 +162,24 @@ function scoreLpHtml(html: string): number {
     'trial', 'sign up', 'get started', 'contact', 'free', 'download', 'register', 'demo',
   ]
   const ctaHits = ctaKeywords.filter((k) => lower.includes(k)).length
-  score += ctaHits * 8
+  score += ctaHits * 6
 
   // ブログ記事・ニュースページ的シグナル（減点）
   if (/<article[\s>]/i.test(html) && /<time[\s>]/i.test(html)) score -= 25
   const articleCount = (html.match(/<article[\s>]/gi) ?? []).length
   if (articleCount > 3) score -= 20
+
+  // リンク密度が高いページはポータル・ブログ（減点）
+  const linkCount = (html.match(/<a\s[^>]*href/gi) ?? []).length
+  if (linkCount > 80) score -= 15
+  if (linkCount > 150) score -= 15
+
+  // ゲート: フォーム要素がなく CTA も少ない場合はLPではない
+  // ニュース記事やプレスリリースはフォームを持たないため、ここで弾く
+  const hasHardLpSignal = hasForm || hasEmailInput || hasSubmitInput
+  if (!hasHardLpSignal && ctaHits < 4) {
+    return 0
+  }
 
   return score
 }
@@ -361,7 +381,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '5')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
   const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '10')
-  const minLpHtmlScore = Number(process.env.LP_HTML_MIN_SCORE ?? '20')
+  const minLpHtmlScore = Number(process.env.LP_HTML_MIN_SCORE ?? '30')
   // 1回の実行で新規挿入＋AI分析する上限。Gemini無料枠のレートリミット対策
   const maxNewPerRun = Number(process.env.LP_DISCOVERY_MAX_NEW_PER_RUN ?? '5')
   const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'false').toLowerCase() === 'true'
