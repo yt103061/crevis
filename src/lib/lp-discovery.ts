@@ -1,5 +1,5 @@
 import RSSParser from 'rss-parser'
-import { analyzeLP } from '@/lib/ai-client'
+import { analyzeLP, extractPageText } from '@/lib/ai-client'
 import { createServiceClient } from '@/lib/supabase'
 import { DEFAULT_LP_DISCOVERY_FEEDS, type LPDiscoveryFeed } from '@/lib/automation/default-feeds'
 
@@ -132,16 +132,52 @@ function heuristicScore(candidate: Candidate): number {
   return score
 }
 
-async function isReachable(url: string): Promise<boolean> {
+/**
+ * B3: LP候補のHTMLを取得し、「本当にLPか」スコアを算出する。
+ * フォーム・CTA要素を加点、ブログ記事的なシグナルを減点。
+ * スコアが低い候補はAI分析前にスキップし、AI呼び出しコストと精度を最適化する。
+ */
+function scoreLpHtml(html: string): number {
+  let score = 0
+  const lower = html.toLowerCase()
+
+  // フォーム・入力要素（高スコア）
+  if (/<form[\s>]/i.test(html)) score += 30
+  if (/<input[^>]+type=["']email["']/i.test(html)) score += 20
+  if (/<input[^>]+type=["']submit["']/i.test(html)) score += 15
+
+  // CTA系キーワード
+  const ctaKeywords = [
+    '申し込み', '資料請求', '無料', '登録', 'お問い合わせ', '今すぐ', '試す', 'ダウンロード',
+    'trial', 'sign up', 'get started', 'contact', 'free', 'download', 'register', 'demo',
+  ]
+  const ctaHits = ctaKeywords.filter((k) => lower.includes(k)).length
+  score += ctaHits * 8
+
+  // ブログ記事・ニュースページ的シグナル（減点）
+  if (/<article[\s>]/i.test(html) && /<time[\s>]/i.test(html)) score -= 25
+  const articleCount = (html.match(/<article[\s>]/gi) ?? []).length
+  if (articleCount > 3) score -= 20
+
+  return score
+}
+
+/** LPページのHTMLをGETで取得する。失敗時はnullを返す。 */
+async function fetchLpHtml(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       redirect: 'follow',
-      signal: AbortSignal.timeout(8000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CreVisBot/1.0; +https://crevis.jp)',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(10000),
     })
-    return res.ok
+    if (!res.ok) return null
+    return await res.text()
   } catch {
-    return false
+    return null
   }
 }
 
@@ -274,6 +310,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '10')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
   const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '10')
+  const minLpHtmlScore = Number(process.env.LP_HTML_MIN_SCORE ?? '20')
   const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'false').toLowerCase() === 'true'
   const requirePerformanceSignal = String(process.env.LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL ?? 'false').toLowerCase() === 'true'
 
@@ -328,9 +365,16 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
             continue
           }
 
-          const reachable = await isReachable(candidate.url)
-          if (!reachable) {
+          // B3: HTMLを取得してLP判定。ブログ記事等をAI分析前に除外する
+          const html = await fetchLpHtml(candidate.url)
+          if (!html) {
             result.skipped++
+            continue
+          }
+
+          const lpHtmlScore = scoreLpHtml(html)
+          if (lpHtmlScore < minLpHtmlScore) {
+            result.heuristic_skipped++
             continue
           }
 
@@ -353,25 +397,43 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
           result.inserted++
 
           try {
+            // A1: 事前取得済みHTMLをそのまま渡すことで再フェッチを回避
+            // A3: LLMがindustry/purpose/target_audienceをページ内容から推論する
             const analysis = await analyzeLP({
               url: candidate.url,
               industry: '不明',
               purpose: '不明',
               target_audience: '不明',
               days_active: 30,
+              rawHtml: html,
             })
+
+            // lp_analysesにはinferred_*フィールドは不要なので除外して保存
+            const {
+              inferred_industry,
+              inferred_purpose,
+              inferred_target_audience,
+              embedding,
+              ...analysisData
+            } = analysis
 
             await supabase.from('lp_analyses').insert({
               lp_id: lp.id,
-              ...analysis,
+              ...analysisData,
+              ...(embedding ? { embedding } : {}),
             })
 
             const shouldActivate = (analysis.total_score ?? 0) >= minScore
+
+            // A3: 推論したメタデータをlpsテーブルに保存
             await supabase
               .from('lps')
               .update({
                 status: shouldActivate ? 'active' : 'archived',
                 last_checked_at: new Date().toISOString(),
+                ...(inferred_industry ? { industry: inferred_industry } : {}),
+                ...(inferred_purpose ? { purpose: inferred_purpose } : {}),
+                ...(inferred_target_audience ? { target_audience: inferred_target_audience } : {}),
               })
               .eq('id', lp.id)
 

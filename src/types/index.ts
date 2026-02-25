@@ -104,6 +104,8 @@ export interface LPAnalysisInput {
   purpose: string
   target_audience: string
   days_active: number
+  /** 事前取得済みの生HTML。渡すと analyzeLP 内での再フェッチをスキップする */
+  rawHtml?: string
 }
 
 export interface LPAnalysisOutput {
@@ -116,6 +118,12 @@ export interface LPAnalysisOutput {
   improvement_points: string[]
   why_it_works: string
   target_match: string
+  /** LLMがページ内容から推論した業界 */
+  inferred_industry?: string
+  /** LLMがページ内容から推論した目的（資料請求・無料トライアル等） */
+  inferred_purpose?: string
+  /** LLMがページ内容から推論したターゲットオーディエンス */
+  inferred_target_audience?: string
 }
 
 export interface ArticleInput {
