@@ -5,12 +5,39 @@ import { DEFAULT_NL_SOURCES } from '@/lib/automation/default-feeds'
 
 const parser = new RSSParser({
   timeout: 10000,
+  customFields: { item: ['content:encoded'] },
 })
 
 export interface NewsletterFetchResult {
   processed: number
   skipped: number
   errors: number
+  sourceErrors: number
+  aiFallbacks: number
+}
+
+
+
+async function parseFeedWithFallback(url: string) {
+  try {
+    return await parser.parseURL(url)
+  } catch (primaryError) {
+    const res = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; CreVisBot/1.0; +https://crevis.jp)',
+        accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+      },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) {
+      const msg = primaryError instanceof Error ? primaryError.message : 'feed_parse_failed'
+      throw new Error(`HTTP ${res.status} (primary: ${msg})`)
+    }
+    const raw = await res.text()
+    return await parser.parseString(raw)
+  }
 }
 
 function normalizeUrl(raw: string): string {
@@ -101,11 +128,11 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
     throw new Error('No active sources found')
   }
 
-  const results: NewsletterFetchResult = { processed: 0, skipped: 0, errors: 0 }
+  const results: NewsletterFetchResult = { processed: 0, skipped: 0, errors: 0, sourceErrors: 0, aiFallbacks: 0 }
 
   for (const source of sources) {
     try {
-      const feed = await parser.parseURL(source.url)
+      const feed = await parseFeedWithFallback(source.url)
       const items = feed.items.slice(0, 10)
 
       for (const item of items) {
@@ -123,9 +150,14 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
           continue
         }
 
-        const content = item.contentSnippet ?? item.content ?? item.summary ?? ''
+        const content = item.contentSnippet ?? (item as { 'content:encoded'?: string })['content:encoded'] ?? item.content ?? item.summary ?? ''
 
-        let aiResult
+        let aiResult: {
+          summary_ja: string | null
+          translated_title_ja: string | null
+          key_insights: string[]
+          relevance_score: number | null
+        }
         try {
           aiResult = await processNewsletterArticle({
             original_title: item.title ?? '',
@@ -133,8 +165,13 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
           })
         } catch (aiError) {
           console.error('AI processing failed for:', normalizedLink, aiError)
-          results.errors++
-          continue
+          results.aiFallbacks++
+          aiResult = {
+            summary_ja: null,
+            translated_title_ja: null,
+            key_insights: [],
+            relevance_score: null,
+          }
         }
 
         const { error: insertError } = await supabase.from('nl_articles').insert({
@@ -164,6 +201,7 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
     } catch (sourceError) {
       console.error(`Failed to fetch source ${source.name}:`, sourceError)
       results.errors++
+      results.sourceErrors++
     }
   }
 

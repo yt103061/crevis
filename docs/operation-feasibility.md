@@ -9,13 +9,14 @@
 - 候補LPを `lps` に自動登録し、AI分析後に `LP_DISCOVERY_MIN_SCORE` 以上なら `active`、それ未満は `archived` に自動振り分けするようにした。
 - 管理者手動実行 API (`/api/admin/lps/discover`) と Cron API (`/api/cron/lp-discover`) を追加した。
 - `vercel.json` にLP discoveryの定期実行（毎日1回）を追加した。
-- `LP_DISCOVERY_FEEDS` 未設定時に、PR TIMESカテゴリ（technology / internet / mobile） の推奨フィードを自動採用するフォールバックを追加した。
+- `LP_DISCOVERY_FEEDS` 未設定時に、Product Hunt / Indie Hackers / HN / Kickstarter の推奨フィードを自動採用するフォールバックを追加した。
 - 日本向けヒューリスティック（`.jp` 優先、LP意図キーワード、成果シグナル、ソース重み）を導入し、`LP_DISCOVERY_MIN_HEURISTIC_SCORE` 未満は自動除外するようにした。
 - フィード取得で失敗した場合に `parseURL` と `fetch+parseString` の二段フォールバックを追加し、失敗内訳を結果に返すようにした。
 
 - `runNewsletterFetch` を共通化し、管理画面の手動実行APIとCron実行APIで再利用できるようにした。
 - `NL_FETCH_AUTO_SEED_SOURCES=true` 時に、海外主要 + 国内マーケ系（Web担当者Forum / MarkeZine / PR TIMESカテゴリ等）の推奨RSSソースを自動投入できるようにした。
 - `/api/cron/nl-fetch` を追加し、`CRON_SECRET` で保護した定期収集エンドポイントを実装した。
+- NL収集でAI要約が失敗した場合でも記事自体は保存し、後続の手動確認/再処理ができるようにした。
 - `vercel.json` に Cron 設定を追加し、Vercel Hobby 制限に合わせて1日1回で収集できる状態にした。
 
 ## 1. 現在できること（実装済み）

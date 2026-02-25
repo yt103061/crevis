@@ -258,7 +258,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '10')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
   const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '55')
-  const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'true').toLowerCase() === 'true'
+  const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'false').toLowerCase() === 'true'
   const requirePerformanceSignal = String(process.env.LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL ?? 'true').toLowerCase() === 'true'
 
   const supabase = createServiceClient({ requireServiceRole: true })
