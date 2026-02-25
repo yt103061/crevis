@@ -513,7 +513,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
             const shouldActivate = (analysis.total_score ?? 0) >= minScore
 
             // A3: 推論したメタデータをlpsテーブルに保存
-            await supabase
+            const { error: updateError } = await supabase
               .from('lps')
               .update({
                 status: shouldActivate ? 'active' : 'archived',
@@ -524,8 +524,14 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
               })
               .eq('id', lp.id)
 
+            if (updateError) {
+              console.error('lps status update failed:', candidate.url, updateError.message)
+              result.errors++
+              result.analysis_error_details.push(`${candidate.url}: lps update: ${updateError.message}`)
+            }
+
             result.analyzed++
-            if (shouldActivate) result.activated++
+            if (shouldActivate && !updateError) result.activated++
           } catch (analysisError) {
             const msg = analysisError instanceof Error ? analysisError.message : 'unknown_error'
             console.error('LP analysis failed for discovered LP:', candidate.url, analysisError)

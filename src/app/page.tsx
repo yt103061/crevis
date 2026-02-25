@@ -24,7 +24,8 @@ async function getLPs(searchParams: SearchParams): Promise<LPWithAnalysis[]> {
 
   query = query.limit(20).order('created_at', { ascending: false })
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) console.error('getLPs query failed:', error.message)
   let lps = (data as LPWithAnalysis[]) ?? []
 
   if (searchParams.sort === 'score') {

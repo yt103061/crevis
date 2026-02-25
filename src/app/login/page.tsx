@@ -77,16 +77,13 @@ function LoginForm() {
   return (
     <div className="glass rounded-2xl p-6 sm:p-8 animate-scale-in">
       {/* Tab */}
-      <div
-        className="flex gap-0 mb-6 rounded-xl p-1"
-        style={{ background: 'rgba(255,255,255,0.05)' }}
-      >
+      <div className="flex gap-0 mb-6 rounded-xl p-1 bg-[#f1f1ee]">
         <button
           onClick={() => { setMode('login'); setError(''); setSuccess('') }}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
             mode === 'login'
-              ? 'bg-indigo-500/20 text-indigo-400 shadow-sm'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'bg-white text-[#111111] shadow-sm'
+              : 'text-[#767b74] hover:text-[#111111]'
           }`}
         >
           ログイン
@@ -95,8 +92,8 @@ function LoginForm() {
           onClick={() => { setMode('signup'); setError(''); setSuccess('') }}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
             mode === 'signup'
-              ? 'bg-indigo-500/20 text-indigo-400 shadow-sm'
-              : 'text-slate-500 hover:text-slate-300'
+              ? 'bg-white text-[#111111] shadow-sm'
+              : 'text-[#767b74] hover:text-[#111111]'
           }`}
         >
           新規登録
@@ -137,7 +134,7 @@ function LoginForm() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-[#323632] mb-1.5">
             メールアドレス
           </label>
           <input
@@ -151,7 +148,7 @@ function LoginForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+          <label className="block text-sm font-medium text-[#323632] mb-1.5">
             パスワード
           </label>
           <input
@@ -185,7 +182,7 @@ function LoginForm() {
       </form>
 
       {mode === 'signup' && (
-        <p className="text-xs text-slate-600 text-center mt-4">
+        <p className="text-xs text-[#767b74] text-center mt-4">
           登録すると、コレクション機能やAIコメント全文が利用できます
         </p>
       )}
@@ -195,32 +192,24 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        background: 'radial-gradient(ellipse 60% 40% at 50% 30%, rgba(99,102,241,0.1) 0%, transparent 60%), #07070f',
-      }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#f7f7f5]">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8 animate-fade-in-up">
           <Link href="/" className="inline-flex items-center gap-2">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-            >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white bg-[#111111]">
               C
             </div>
           </Link>
-          <h1 className="text-xl font-bold text-white mt-4">CreVisにログイン</h1>
-          <p className="text-slate-500 mt-1 text-sm">成果の出るLPギャラリー</p>
+          <h1 className="text-xl font-bold text-[#111111] mt-4">CreVisにログイン</h1>
+          <p className="text-[#767b74] mt-1 text-sm">成果の出るLPギャラリー</p>
         </div>
 
-        <Suspense fallback={<div className="glass rounded-2xl p-8 text-center text-slate-500 shimmer h-80" />}>
+        <Suspense fallback={<div className="glass rounded-2xl p-8 text-center text-[#767b74] shimmer h-80" />}>
           <LoginForm />
         </Suspense>
 
-        <p className="text-center text-sm text-slate-600 mt-6">
-          <Link href="/" className="hover:text-slate-400 transition-colors">
+        <p className="text-center text-sm text-[#767b74] mt-6">
+          <Link href="/" className="hover:text-[#111111] transition-colors">
             ← ギャラリーに戻る
           </Link>
         </p>
