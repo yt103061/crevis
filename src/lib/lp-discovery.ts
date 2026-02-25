@@ -3,7 +3,12 @@ import { analyzeLP } from '@/lib/ai-client'
 import { createServiceClient } from '@/lib/supabase'
 import { DEFAULT_LP_DISCOVERY_FEEDS, type LPDiscoveryFeed } from '@/lib/automation/default-feeds'
 
-const parser = new RSSParser({ timeout: 10000 })
+const parser = new RSSParser({
+  timeout: 10000,
+  customFields: {
+    item: ['content:encoded'],
+  },
+})
 
 export interface LPDiscoveryResult {
   discovered: number
@@ -13,6 +18,8 @@ export interface LPDiscoveryResult {
   skipped: number
   heuristic_skipped: number
   errors: number
+  feed_errors: number
+  feed_error_details: string[]
 }
 
 interface Candidate {
@@ -148,6 +155,35 @@ function extractLinksFromHtml(html: string): string[] {
   return links
 }
 
+
+
+async function fetchFeedWithFallback(feed: LPDiscoveryFeed) {
+  try {
+    return await parser.parseURL(feed.url)
+  } catch (primaryError) {
+    try {
+      const res = await fetch(feed.url, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'user-agent': 'Mozilla/5.0 (compatible; CreVisBot/1.0; +https://crevis.jp)',
+          accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+        },
+        signal: AbortSignal.timeout(12000),
+      })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const raw = await res.text()
+      return await parser.parseString(raw)
+    } catch (fallbackError) {
+      const message = fallbackError instanceof Error ? fallbackError.message : 'unknown_feed_error'
+      const primaryMessage = primaryError instanceof Error ? primaryError.message : 'unknown_primary_error'
+      throw new Error(`${feed.name}: ${message} (primary: ${primaryMessage})`)
+    }
+  }
+}
+
 async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDiscoveryFeed): Promise<string[]> {
   try {
     const res = await fetch(itemLink, {
@@ -234,11 +270,13 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
     skipped: 0,
     heuristic_skipped: 0,
     errors: 0,
+    feed_errors: 0,
+    feed_error_details: [],
   }
 
   for (const feed of feeds) {
     try {
-      const parsed = await parser.parseURL(feed.url)
+      const parsed = await fetchFeedWithFallback(feed)
       const items = parsed.items.slice(0, perFeedLimit)
 
       for (const item of items) {
@@ -330,8 +368,11 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
         }
       }
     } catch (feedError) {
+      const message = feedError instanceof Error ? feedError.message : 'feed_fetch_failed'
       console.error('LP discovery feed fetch failed:', feed.url, feedError)
       result.errors++
+      result.feed_errors++
+      result.feed_error_details.push(message)
     }
   }
 

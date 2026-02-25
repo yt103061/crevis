@@ -11,6 +11,7 @@
 - `vercel.json` にLP discoveryの定期実行（毎日1回）を追加した。
 - `LP_DISCOVERY_FEEDS` 未設定時に、PR TIMESカテゴリ（technology / internet / mobile） の推奨フィードを自動採用するフォールバックを追加した。
 - 日本向けヒューリスティック（`.jp` 優先、LP意図キーワード、成果シグナル、ソース重み）を導入し、`LP_DISCOVERY_MIN_HEURISTIC_SCORE` 未満は自動除外するようにした。
+- フィード取得で失敗した場合に `parseURL` と `fetch+parseString` の二段フォールバックを追加し、失敗内訳を結果に返すようにした。
 
 - `runNewsletterFetch` を共通化し、管理画面の手動実行APIとCron実行APIで再利用できるようにした。
 - `NL_FETCH_AUTO_SEED_SOURCES=true` 時に、海外主要 + 国内マーケ系（Web担当者Forum / MarkeZine / PR TIMESカテゴリ等）の推奨RSSソースを自動投入できるようにした。

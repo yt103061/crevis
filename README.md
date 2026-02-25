@@ -79,6 +79,7 @@ AI_PROVIDER=claude
   - `/api/cron/nl-fetch` : 毎日1回（Hobby制限対応）
   - `/api/cron/nl-issue` : 毎週木曜
 - LP収集では URL/タイトル/ソース重みを使ったヒューリスティック判定を実施し、`LP_DISCOVERY_MIN_HEURISTIC_SCORE` 未満は除外します。`LP_DISCOVERY_JP_ONLY=true` で日本向けドメインを優先し、`LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL=true` で成果シグナル（CVR/導入実績/事例等）を含む候補を優先します。
+- フィード取得失敗時は `parseURL` → `fetch + parseString` の順でフォールバックし、管理画面にフィードエラー件数/詳細を表示します。
 
 ## ライセンス
 

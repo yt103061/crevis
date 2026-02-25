@@ -59,6 +59,7 @@ export default function AdminLPsPage() {
     }
 
     const results = data.results
+    const feedErr = (results.feed_error_details ?? []).slice(0, 3).join(' / ')
     alert(
       `自動発見完了
 候補: ${results.discovered}件
@@ -67,7 +68,9 @@ export default function AdminLPsPage() {
 公開: ${results.activated}件
 スキップ: ${results.skipped}件
 ヒューリスティック除外: ${results.heuristic_skipped ?? 0}件
-エラー: ${results.errors}件`
+エラー: ${results.errors}件
+フィードエラー: ${results.feed_errors ?? 0}件${feedErr ? `
+詳細: ${feedErr}` : ''}`
     )
     fetchLPs()
   }
