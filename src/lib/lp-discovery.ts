@@ -165,14 +165,24 @@ function scoreLpHtml(html: string): number {
   score += ctaHits * 6
 
   // ブログ記事・ニュースページ的シグナル（減点）
-  if (/<article[\s>]/i.test(html) && /<time[\s>]/i.test(html)) score -= 25
+  if (/<article[\s>]/i.test(html) && /<time[\s>]/i.test(html)) score -= 30
   const articleCount = (html.match(/<article[\s>]/gi) ?? []).length
-  if (articleCount > 3) score -= 20
+  if (articleCount > 3) score -= 25
 
   // リンク密度が高いページはポータル・ブログ（減点）
   const linkCount = (html.match(/<a\s[^>]*href/gi) ?? []).length
-  if (linkCount > 80) score -= 15
-  if (linkCount > 150) score -= 15
+  if (linkCount > 80) score -= 20
+  if (linkCount > 150) score -= 20
+
+  // OGP/メタタグによるコンテンツタイプ判定（強い減点）
+  if (/property=["']article:published_time["']/i.test(html)) score -= 40
+  if (/property=["']article:author["']/i.test(html)) score -= 20
+  if (/name=["']news_keywords["']/i.test(html)) score -= 40
+  // JSON-LDでニュース記事・ブログ記事と明示されている場合
+  if (/"@type"\s*:\s*["'](NewsArticle|Article|BlogPosting|Blog)["']/i.test(html)) score -= 40
+  // 雑誌・メディア系ページのシグナル
+  if (/class=["'][^"']*byline[^"']*["']/i.test(html)) score -= 20
+  if (/class=["'][^"']*author[^"']*["']/i.test(html) && /<time[\s>]/i.test(html)) score -= 20
 
   // ゲート: フォーム要素がなく CTA も少ない場合はLPではない
   // ニュース記事やプレスリリースはフォームを持たないため、ここで弾く
@@ -251,10 +261,10 @@ async function fetchFeedWithFallback(feed: LPDiscoveryFeed) {
 const BLOCKED_DISCOVERY_DOMAINS = new Set([
   // PR TIMES本体および傘下・パートナーサービス
   'prtimes.jp', 'prtimes.co.jp',
-  'preditor.prtimes.com',       // PR TIMES提供のPRツール
-  'tayori.com',                  // PR TIMESグループのお問い合わせツール
-  'jooto.com',                   // PR TIMESグループのプロジェクト管理
-  'predge.jp',                   // PR TIMESのPRメディア
+  'preditor.prtimes.com',
+  'tayori.com',
+  'jooto.com',
+  'predge.jp',
   // ソーシャルメディア
   'twitter.com', 'x.com', 'facebook.com', 'instagram.com',
   'linkedin.com', 'youtube.com', 'tiktok.com',
@@ -266,8 +276,33 @@ const BLOCKED_DISCOVERY_DOMAINS = new Set([
   'app.adjust.com', 'bit.ly', 'ow.ly', 'lnkd.in',
   // コード・開発
   'github.com', 'github.io',
-  // ニュース・メディア（LPではなく記事を掲載するサイト）
-  'note.com', 'prtimes.jp',
+  // 日本のブログ・ノートプラットフォーム
+  'note.com', 'hatenablog.com', 'hatena.ne.jp', 'qiita.com', 'zenn.dev',
+  // グローバルブログプラットフォーム
+  'medium.com', 'substack.com', 'wordpress.com', 'blogger.com',
+  // 日本の主要ニュース・新聞社（記事ページはLPではない）
+  'nikkei.com', 'asahi.com', 'yomiuri.co.jp', 'mainichi.jp', 'sankei.com',
+  'jiji.com', 'kyodo.co.jp', 'nhk.or.jp', 'nhk.jp',
+  // 日本の経済・ビジネス系メディア
+  'toyokeizai.net', 'diamond.jp', 'president.jp', 'businessinsider.jp',
+  'forbesjapan.com', 'fortune.com',
+  // 日本のIT・テック系メディア
+  'itmedia.co.jp', 'impress.co.jp', 'impressrd.jp', 'computerworld.jp',
+  'zdnet.com', 'cnet.com', 'wired.com', 'wired.jp',
+  // グローバルIT・テック系メディア
+  'techcrunch.com', 'venturebeat.com', 'thebridge.jp',
+  'theverge.com', 'engadget.com', 'mashable.com', 'gizmodo.com',
+  // 日本のマーケ・ウェブ業界メディア（記事サイト）
+  'webtan.impress.co.jp', 'markezine.jp', 'ferret-plus.com',
+  'digiday.jp', 'liginc.co.jp',
+  // 週刊誌・雑誌系
+  'newsweekjapan.jp', 'newsweek.com', 'bunshun.jp', 'shueisha.co.jp',
+  'kodansha.co.jp', 'kadokawa.co.jp',
+  // Q&A・コミュニティ
+  'stackoverflow.com', 'reddit.com', 'quora.com',
+  'yahoo.co.jp', 'chiebukuro.yahoo.co.jp',
+  // Wikipedia・辞典
+  'wikipedia.org', 'ja.wikipedia.org',
 ])
 
 /**
@@ -277,6 +312,13 @@ const BLOCKED_DISCOVERY_DOMAINS = new Set([
 const BLOCKED_PATH_PREFIXES = [
   '/policy', '/privacy', '/terms', '/legal', '/sitemap',
   '/notice/', '/faq', '/recruit', '/ir/',
+  // メディア・雑誌・記事ページ
+  '/magazine', '/magazine/', '/news/', '/article/', '/articles/',
+  '/column/', '/columns/', '/release/', '/press/', '/press-release/',
+  '/blog/', '/blogs/',
+  // その他の非LPページ
+  '/about', '/company', '/contact', '/support', '/help/',
+  '/member/', '/mypage', '/cart', '/shop/',
 ]
 
 async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDiscoveryFeed): Promise<string[]> {
@@ -381,7 +423,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '5')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
   const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '10')
-  const minLpHtmlScore = Number(process.env.LP_HTML_MIN_SCORE ?? '30')
+  const minLpHtmlScore = Number(process.env.LP_HTML_MIN_SCORE ?? '45')
   // 1回の実行で新規挿入＋AI分析する上限。Gemini無料枠のレートリミット対策
   const maxNewPerRun = Number(process.env.LP_DISCOVERY_MAX_NEW_PER_RUN ?? '5')
   const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'false').toLowerCase() === 'true'
