@@ -9,6 +9,7 @@ import { formatDate, scoreBg } from '@/lib/utils'
 export default function AdminLPsPage() {
   const [lps, setLps] = useState<LPWithAnalysis[]>([])
   const [loading, setLoading] = useState(true)
+  const [discovering, setDiscovering] = useState(false)
   const [filter, setFilter] = useState({ status: 'active', industry: '', sortBy: 'created_at' })
 
   useEffect(() => {
@@ -45,6 +46,31 @@ export default function AdminLPsPage() {
     if (res.ok) fetchLPs()
   }
 
+
+  async function discoverLPs() {
+    setDiscovering(true)
+    const res = await fetch('/api/admin/lps/discover', { method: 'POST' })
+    const data = await res.json()
+    setDiscovering(false)
+
+    if (!res.ok) {
+      alert(data.error ?? '自動発見に失敗しました')
+      return
+    }
+
+    const results = data.results
+    alert(
+      `自動発見完了
+候補: ${results.discovered}件
+登録: ${results.inserted}件
+分析: ${results.analyzed}件
+公開: ${results.activated}件
+スキップ: ${results.skipped}件
+エラー: ${results.errors}件`
+    )
+    fetchLPs()
+  }
+
   async function reanalyze(id: string) {
     const res = await fetch(`/api/admin/lps/${id}`, {
       method: 'PATCH',
@@ -59,14 +85,23 @@ export default function AdminLPsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-2 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-900">LP一覧</h1>
-        <Link
-          href="/admin/lps/new"
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-        >
-          + LP登録
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={discoverLPs}
+            disabled={discovering}
+            className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {discovering ? '収集中...' : 'Webから自動発見'}
+          </button>
+          <Link
+            href="/admin/lps/new"
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
+          >
+            + LP登録
+          </Link>
+        </div>
       </div>
 
       {/* フィルター */}
