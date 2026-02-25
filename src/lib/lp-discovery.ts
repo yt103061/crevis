@@ -497,11 +497,18 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
               ...analysisData
             } = analysis
 
-            await supabase.from('lp_analyses').insert({
+            const { error: analysisInsertError } = await supabase.from('lp_analyses').insert({
               lp_id: lp.id,
               ...analysisData,
               ...(embedding ? { embedding } : {}),
             })
+            if (analysisInsertError) {
+              // 分析データの保存失敗 → アクティベートせずエラー記録
+              console.error('lp_analyses insert failed:', candidate.url, analysisInsertError.message)
+              result.errors++
+              result.analysis_error_details.push(`${candidate.url}: lp_analyses insert: ${analysisInsertError.message}`)
+              continue
+            }
 
             const shouldActivate = (analysis.total_score ?? 0) >= minScore
 
