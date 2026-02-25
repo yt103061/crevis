@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -111,4 +113,9 @@ body {
 
 .input-dark::placeholder {
   color: #7a7f77;
+}
+
+.font-num {
+  font-family: 'Oswald', 'DIN Alternate', 'DIN 2014', 'Noto Sans JP', sans-serif;
+  letter-spacing: 0.02em;
 }

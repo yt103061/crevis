@@ -143,7 +143,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 function StatChip({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex items-baseline gap-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#d9dbd6]">
-      <span className="text-base font-semibold text-[#111111]">{value}</span>
+      <span className="text-base font-semibold text-[#111111] font-num">{value}</span>
       <span className="text-[11px] text-[#767b74]">{label}</span>
     </div>
   )

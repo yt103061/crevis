@@ -45,7 +45,7 @@ export function LPCard({ lp, featured = false, priority = false }: LPCardProps) 
           )}
 
           {analysis && (
-            <div className="absolute top-2 right-2 bg-white/95 border border-[#d9dbd6] rounded px-2 py-0.5 text-xs font-semibold text-[#111]">
+            <div className="absolute top-2 right-2 bg-white/95 border border-[#d9dbd6] rounded px-2 py-0.5 text-xs font-semibold text-[#111] font-num">
               {analysis.total_score}
             </div>
           )}
@@ -72,7 +72,7 @@ export function LPCard({ lp, featured = false, priority = false }: LPCardProps) 
               ].map(({ label, score }) => (
                 <div key={label} className="text-center">
                   <p className="text-[10px] text-[#767b74]">{label}</p>
-                  <p className={`text-xs font-semibold ${scoreColor(score)}`}>{score}</p>
+                  <p className={`text-xs font-semibold font-num ${scoreColor(score)}`}>{score}</p>
                 </div>
               ))}
             </div>
