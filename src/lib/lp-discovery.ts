@@ -20,6 +20,8 @@ export interface LPDiscoveryResult {
   errors: number
   feed_errors: number
   feed_error_details: string[]
+  /** AI分析に失敗したLPのURL＋エラーメッセージ */
+  analysis_error_details: string[]
 }
 
 interface Candidate {
@@ -356,10 +358,12 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
     throw new Error('LP discovery feeds are empty. Set LP_DISCOVERY_FEEDS or enable LP_DISCOVERY_USE_DEFAULT_FEEDS=true')
   }
 
-  const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '10')
+  const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '5')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
   const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '10')
   const minLpHtmlScore = Number(process.env.LP_HTML_MIN_SCORE ?? '20')
+  // 1回の実行で新規挿入＋AI分析する上限。Gemini無料枠のレートリミット対策
+  const maxNewPerRun = Number(process.env.LP_DISCOVERY_MAX_NEW_PER_RUN ?? '5')
   const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'false').toLowerCase() === 'true'
   const requirePerformanceSignal = String(process.env.LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL ?? 'false').toLowerCase() === 'true'
 
@@ -374,6 +378,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
     errors: 0,
     feed_errors: 0,
     feed_error_details: [],
+    analysis_error_details: [],
   }
 
   for (const feed of feeds) {
@@ -411,6 +416,12 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
 
           if (existing) {
             result.skipped++
+            continue
+          }
+
+          // 1回の実行で挿入する上限に達したらそれ以降はスキップ
+          if (result.inserted >= maxNewPerRun) {
+            result.heuristic_skipped++
             continue
           }
 
@@ -489,8 +500,10 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
             result.analyzed++
             if (shouldActivate) result.activated++
           } catch (analysisError) {
+            const msg = analysisError instanceof Error ? analysisError.message : 'unknown_error'
             console.error('LP analysis failed for discovered LP:', candidate.url, analysisError)
             result.errors++
+            result.analysis_error_details.push(`${candidate.url}: ${msg}`)
           }
         }
       }

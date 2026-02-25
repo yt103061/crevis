@@ -49,7 +49,7 @@ export const DEFAULT_LP_DISCOVERY_FEEDS: LPDiscoveryFeed[] = [
     market: 'jp',
     weight: 28,
   },
-  // グローバル（中間ページから製品サイトURLを抽出）
+  // グローバル（中間ページから製品サイトURLを抽出 or 直接URL取得）
   {
     name: 'Product Hunt',
     url: 'https://www.producthunt.com/feed',
@@ -57,13 +57,7 @@ export const DEFAULT_LP_DISCOVERY_FEEDS: LPDiscoveryFeed[] = [
     market: 'global',
     weight: 22,
   },
-  {
-    name: 'Indie Hackers Products',
-    url: 'https://www.indiehackers.com/products.rss',
-    type: 'intermediary',
-    market: 'global',
-    weight: 20,
-  },
+  // Indie Hackers Products は RSS フィードの XML が壊れているため除外
   {
     name: 'Hacker News Show HN',
     url: 'https://hnrss.org/show',
