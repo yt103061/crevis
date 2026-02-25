@@ -1,5 +1,5 @@
 import RSSParser from 'rss-parser'
-import { analyzeLP, extractPageText } from '@/lib/ai-client'
+import { analyzeLP } from '@/lib/ai-client'
 import { createServiceClient } from '@/lib/supabase'
 import { DEFAULT_LP_DISCOVERY_FEEDS, type LPDiscoveryFeed } from '@/lib/automation/default-feeds'
 

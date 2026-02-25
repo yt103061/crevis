@@ -22,7 +22,7 @@ export async function GET() {
   const metricsMap = new Map(metrics.map((m: SourceQualityMetrics) => [m.source_id, m]))
   const sourcesWithMetrics = (data ?? []).map((s: Record<string, unknown>) => ({
     ...s,
-    metrics: metricsMap.get(s.id) ?? null,
+    metrics: metricsMap.get(s.id as string) ?? null,
   }))
 
   return NextResponse.json({ sources: sourcesWithMetrics })
