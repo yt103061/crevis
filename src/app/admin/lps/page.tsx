@@ -66,6 +66,7 @@ export default function AdminLPsPage() {
 分析: ${results.analyzed}件
 公開: ${results.activated}件
 スキップ: ${results.skipped}件
+ヒューリスティック除外: ${results.heuristic_skipped ?? 0}件
 エラー: ${results.errors}件`
     )
     fetchLPs()

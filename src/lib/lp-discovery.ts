@@ -87,12 +87,37 @@ function containsLpIntentKeyword(text: string): boolean {
   return keywords.some((k) => s.includes(k))
 }
 
+function containsPerformanceSignal(text: string): boolean {
+  const s = text.toLowerCase()
+  const keywords = [
+    'cvr',
+    'cv',
+    'roas',
+    'roi',
+    '売上',
+    '成約',
+    '導入実績',
+    '利用社数',
+    '累計',
+    '達成',
+    '改善',
+    '成果',
+    '実績',
+    '比較',
+    '事例',
+  ]
+  return keywords.some((k) => s.includes(k))
+}
+
 function heuristicScore(candidate: Candidate): number {
   let score = candidate.sourceWeight
   if (isJapaneseCandidate(candidate.url)) score += 24
 
   if (containsLpIntentKeyword(candidate.url)) score += 18
   if (candidate.title && containsLpIntentKeyword(candidate.title)) score += 16
+
+  if (containsPerformanceSignal(candidate.url)) score += 10
+  if (candidate.title && containsPerformanceSignal(candidate.title)) score += 16
 
   if (candidate.market === 'jp') score += 12
   if (candidate.url.includes('/lp') || candidate.url.includes('/campaign')) score += 8
@@ -198,6 +223,7 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
   const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '55')
   const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'true').toLowerCase() === 'true'
+  const requirePerformanceSignal = String(process.env.LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL ?? 'true').toLowerCase() === 'true'
 
   const supabase = createServiceClient({ requireServiceRole: true })
   const result: LPDiscoveryResult = {
@@ -221,6 +247,12 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
           result.discovered++
 
           if (jpOnly && !isJapaneseCandidate(candidate.url)) {
+            result.heuristic_skipped++
+            continue
+          }
+
+          const textForSignal = `${candidate.title ?? ''} ${candidate.url}`
+          if (requirePerformanceSignal && !containsPerformanceSignal(textForSignal)) {
             result.heuristic_skipped++
             continue
           }
