@@ -1,16 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import type { NewsletterIssue } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 export default function NLIssuesPage() {
   const [issues, setIssues] = useState<NewsletterIssue[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
   const [sending, setSending] = useState<string | null>(null)
   const [automating, setAutomating] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -21,72 +22,95 @@ export default function NLIssuesPage() {
 
   async function fetchIssues() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('newsletter_issues')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('fetchIssues error:', error)
+    setFetchError('')
+    try {
+      const res = await fetch('/api/admin/nl/issues')
+      const data = await res.json()
+      if (!res.ok) {
+        setFetchError(data.error ?? `エラー ${res.status}`)
+        setIssues([])
+      } else {
+        setIssues(data.issues ?? [])
+      }
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : '読み込みに失敗しました')
+      setIssues([])
+    } finally {
+      setLoading(false)
     }
-    setIssues((data as NewsletterIssue[]) ?? [])
-    setLoading(false)
   }
 
   async function createIssue(e: React.FormEvent) {
     e.preventDefault()
     setCreating(true)
-    const res = await fetch('/api/admin/nl/issues', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    })
-    const data = await res.json()
-    setCreating(false)
+    setCreateError('')
+    try {
+      const res = await fetch('/api/admin/nl/issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      const data = await res.json()
 
-    if (res.ok) {
-      setTitle('')
-      setShowForm(false)
-      await fetchIssues()
-    } else {
-      alert(`号の作成に失敗しました: ${data.error ?? res.status}`)
+      if (res.ok && data.issue) {
+        setTitle('')
+        setShowForm(false)
+        // レスポンスから直接リストに追加（再取得は補完として実行）
+        setIssues((prev) => [data.issue as NewsletterIssue, ...prev])
+        fetchIssues() // バックグラウンドで再同期
+      } else {
+        setCreateError(data.error ?? `作成に失敗しました (${res.status})`)
+      }
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : '通信エラーが発生しました')
+    } finally {
+      setCreating(false)
     }
   }
 
   async function runAutomation() {
     setAutomating(true)
-    const res = await fetch('/api/admin/nl/automation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-    const data = await res.json()
-    setAutomating(false)
+    try {
+      const res = await fetch('/api/admin/nl/automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
 
-    if (!res.ok) {
-      alert(data.error ?? '自動化実行に失敗しました')
-      return
+      if (!res.ok) {
+        alert(data.error ?? '自動化実行に失敗しました')
+        return
+      }
+
+      const draftMsg = data.issueDraft?.created
+        ? `号ドラフト作成: ${data.issueDraft.articleCount}件採用`
+        : `号ドラフト作成: スキップ（${data.issueDraft?.reason ?? 'unknown'}）`
+
+      alert(
+        `自動化完了\n収集: ${data.fetchResults.processed}件追加 / ${data.fetchResults.skipped}件スキップ / ${data.fetchResults.errors}件エラー\n自動承認: ${data.autoApproved}件\n${draftMsg}`
+      )
+      await fetchIssues()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '自動化に失敗しました')
+    } finally {
+      setAutomating(false)
     }
-
-    const draftMsg = data.issueDraft?.created
-      ? `号ドラフト作成: ${data.issueDraft.articleCount}件採用`
-      : `号ドラフト作成: スキップ（${data.issueDraft?.reason ?? 'unknown'}）`
-
-    alert(
-      `自動化完了\n収集: ${data.fetchResults.processed}件追加 / ${data.fetchResults.skipped}件スキップ / ${data.fetchResults.errors}件エラー\n自動承認: ${data.autoApproved}件\n${draftMsg}`
-    )
-    await fetchIssues()
   }
 
   async function updateStatus(id: string, status: string) {
-    const res = await fetch(`/api/admin/nl/issues/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      alert(`更新に失敗しました: ${data.error ?? res.status}`)
+    try {
+      const res = await fetch(`/api/admin/nl/issues/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(`更新に失敗しました: ${data.error ?? res.status}`)
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '更新に失敗しました')
     }
     await fetchIssues()
   }
@@ -94,30 +118,43 @@ export default function NLIssuesPage() {
   async function sendIssue(id: string) {
     if (!confirm('本当に配信しますか？配信後は取り消しできません。')) return
     setSending(id)
-    const res = await fetch(`/api/admin/nl/issues/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'send' }),
-    })
-    setSending(null)
-    const data = await res.json()
-    if (res.ok) {
-      alert(`配信完了: ${data.sentCount}件送信`)
-      await fetchIssues()
-    } else {
-      alert(data.error ?? '配信に失敗しました')
+    try {
+      const res = await fetch(`/api/admin/nl/issues/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send' }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        alert(`配信完了: ${data.sentCount}件送信`)
+        await fetchIssues()
+      } else {
+        alert(data.error ?? '配信に失敗しました')
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '配信に失敗しました')
+    } finally {
+      setSending(null)
     }
   }
 
   async function deleteIssue(id: string, issueNumber: number) {
     if (!confirm(`第${issueNumber}号を削除しますか？`)) return
     setDeleting(id)
-    const { error } = await supabase.from('newsletter_issues').delete().eq('id', id)
-    setDeleting(null)
-    if (error) {
-      alert(`削除に失敗しました: ${error.message}`)
-    } else {
-      await fetchIssues()
+    try {
+      const res = await fetch(`/api/admin/nl/issues/${id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(`削除に失敗しました: ${data.error ?? res.status}`)
+      } else {
+        setIssues((prev) => prev.filter((i) => i.id !== id))
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '削除に失敗しました')
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -152,7 +189,7 @@ export default function NLIssuesPage() {
             {automating ? '自動化実行中...' : '自動化を実行'}
           </button>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => { setShowForm(!showForm); setCreateError('') }}
             className="px-3 py-2 bg-[#111111] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a2a] transition-colors"
           >
             + 号を作成
@@ -164,13 +201,14 @@ export default function NLIssuesPage() {
       {showForm && (
         <form onSubmit={createIssue} className="bg-white rounded-xl border border-[#d9dbd6] p-4 mb-4">
           <p className="text-sm font-medium text-[#111111] mb-3">新しい号を作成</p>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="号のタイトルを入力（例: CRO週刊 #12）"
               required
+              autoFocus
               className="flex-1 input-dark text-sm"
             />
             <button
@@ -182,12 +220,15 @@ export default function NLIssuesPage() {
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setCreateError('') }}
               className="px-3 py-2 border border-[#d9dbd6] text-[#5e625c] text-sm rounded-lg hover:bg-[#f1f1ee]"
             >
               キャンセル
             </button>
           </div>
+          {createError && (
+            <p className="mt-2 text-sm text-rose-600">{createError}</p>
+          )}
         </form>
       )}
 
@@ -202,6 +243,14 @@ export default function NLIssuesPage() {
           <br />「自動化を実行」を使うと、承認済み記事からドラフトを自動生成できます。
         </p>
       </div>
+
+      {/* エラー表示 */}
+      {fetchError && (
+        <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 flex items-center justify-between gap-2">
+          <span>{fetchError}</span>
+          <button onClick={fetchIssues} className="text-xs underline shrink-0">再読み込み</button>
+        </div>
+      )}
 
       {/* 一覧 */}
       {loading ? (
@@ -257,13 +306,13 @@ export default function NLIssuesPage() {
                       {sending === issue.id ? '配信中...' : '配信する'}
                     </button>
                   )}
-                  {issue.status === 'draft' && (
+                  {issue.status !== 'sent' && (
                     <button
                       onClick={() => deleteIssue(issue.id, issue.issue_number)}
                       disabled={deleting === issue.id}
                       className="text-xs text-rose-600 hover:underline ml-auto disabled:opacity-50"
                     >
-                      削除
+                      {deleting === issue.id ? '削除中...' : '削除'}
                     </button>
                   )}
                 </div>
@@ -328,7 +377,7 @@ export default function NLIssuesPage() {
                               disabled={deleting === issue.id}
                               className="text-xs text-rose-600 hover:underline disabled:opacity-50"
                             >
-                              削除
+                              {deleting === issue.id ? '削除中...' : '削除'}
                             </button>
                           )}
                         </div>

@@ -3,6 +3,25 @@ import { createServiceClient } from '@/lib/supabase'
 import { requireAdminAuth } from '@/lib/auth'
 import { sendIssue } from '@/lib/newsletter/issue-automation'
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await requireAdminAuth()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const supabase = createServiceClient({ requireServiceRole: true })
+  const { error } = await supabase.from('newsletter_issues').delete().eq('id', params.id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

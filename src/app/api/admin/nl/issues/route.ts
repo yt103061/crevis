@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { requireAdminAuth } from '@/lib/auth'
 
+export async function GET() {
+  const session = await requireAdminAuth()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const supabase = createServiceClient({ requireServiceRole: true })
+  const { data, error } = await supabase
+    .from('newsletter_issues')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ issues: data ?? [] })
+}
+
 export async function POST(request: NextRequest) {
   const session = await requireAdminAuth()
   if (!session) {
