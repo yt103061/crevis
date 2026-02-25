@@ -14,6 +14,8 @@ export interface NewsletterFetchResult {
   errors: number
   sourceErrors: number
   aiFallbacks: number
+  /** フェッチに失敗したソースの詳細（"ソース名: エラー内容" 形式） */
+  source_error_details: string[]
 }
 
 
@@ -149,7 +151,7 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
     throw new Error('No active sources found')
   }
 
-  const results: NewsletterFetchResult = { processed: 0, skipped: 0, errors: 0, sourceErrors: 0, aiFallbacks: 0 }
+  const results: NewsletterFetchResult = { processed: 0, skipped: 0, errors: 0, sourceErrors: 0, aiFallbacks: 0, source_error_details: [] }
 
   for (const source of sources) {
     try {
@@ -220,9 +222,11 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
         .update({ last_fetched_at: new Date().toISOString() })
         .eq('id', source.id)
     } catch (sourceError) {
+      const msg = sourceError instanceof Error ? sourceError.message : 'unknown_error'
       console.error(`Failed to fetch source ${source.name}:`, sourceError)
       results.errors++
       results.sourceErrors++
+      results.source_error_details.push(`${source.name}: ${msg}`)
     }
   }
 

@@ -220,6 +220,43 @@ async function fetchFeedWithFallback(feed: LPDiscoveryFeed) {
   }
 }
 
+/**
+ * LP候補として不適切なドメイン。
+ * PR TIMESのプレスリリースページにはサイドバー・フッターに
+ * パートナーサービスや外部サービスへのリンクが大量に含まれるため、
+ * 既知の非LP系ドメインをここで除外する。
+ */
+const BLOCKED_DISCOVERY_DOMAINS = new Set([
+  // PR TIMES本体および傘下・パートナーサービス
+  'prtimes.jp', 'prtimes.co.jp',
+  'preditor.prtimes.com',       // PR TIMES提供のPRツール
+  'tayori.com',                  // PR TIMESグループのお問い合わせツール
+  'jooto.com',                   // PR TIMESグループのプロジェクト管理
+  'predge.jp',                   // PR TIMESのPRメディア
+  // ソーシャルメディア
+  'twitter.com', 'x.com', 'facebook.com', 'instagram.com',
+  'linkedin.com', 'youtube.com', 'tiktok.com',
+  // ECプラットフォーム（商品ページはLPではない）
+  'amazon.co.jp', 'amazon.com', 'rakuten.co.jp',
+  // アプリストア
+  'apps.apple.com', 'play.google.com', 'itunes.apple.com',
+  // 計測・リダイレクト
+  'app.adjust.com', 'bit.ly', 'ow.ly', 'lnkd.in',
+  // コード・開発
+  'github.com', 'github.io',
+  // ニュース・メディア（LPではなく記事を掲載するサイト）
+  'note.com', 'prtimes.jp',
+])
+
+/**
+ * LP候補として不適切なURLパスのプレフィックス。
+ * 法務ページ・お知らせページ・FAQ等はCRO分析対象のLPではない。
+ */
+const BLOCKED_PATH_PREFIXES = [
+  '/policy', '/privacy', '/terms', '/legal', '/sitemap',
+  '/notice/', '/faq', '/recruit', '/ir/',
+]
+
 async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDiscoveryFeed): Promise<string[]> {
   try {
     const res = await fetch(itemLink, {
@@ -230,7 +267,6 @@ async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDisco
     if (!res.ok) return []
     const html = await res.text()
 
-    // フィード自身のドメインへのリンクを除外（例: producthunt.com → producthunt.comリンクを除く）
     let feedHost = ''
     try {
       feedHost = new URL(feed.url).hostname.replace(/^www\./, '')
@@ -251,14 +287,27 @@ async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDisco
       .filter((u): u is string => !!u)
       .map((u) => normalizeUrl(u))
       .filter((u): u is string => !!u)
-      .filter((u) => !u.includes('prtimes.jp'))
-      .filter((u) => !u.includes('twitter.com') && !u.includes('x.com') && !u.includes('facebook.com') && !u.includes('instagram.com') && !u.includes('linkedin.com') && !u.includes('youtube.com'))
       .filter((u) => {
-        if (!feedHost) return true
         try {
-          return !new URL(u).hostname.replace(/^www\./, '').endsWith(feedHost)
-        } catch {
+          const parsed = new URL(u)
+          const host = parsed.hostname.replace(/^www\./, '')
+
+          // ブロック対象ドメイン
+          if (BLOCKED_DISCOVERY_DOMAINS.has(host) || BLOCKED_DISCOVERY_DOMAINS.has(parsed.hostname)) return false
+
+          // フィード自身のドメインを除外（intermediaryサイト自身へのリンクを除く）
+          if (feedHost && host.endsWith(feedHost)) return false
+
+          // トップページ（パスなし・ルートのみ）はLPではなく会社トップページ
+          if (parsed.pathname === '/' || parsed.pathname === '') return false
+
+          // 法務・お知らせ・FAQ等の非LPページパターン
+          const pathLower = parsed.pathname.toLowerCase()
+          if (BLOCKED_PATH_PREFIXES.some((p) => pathLower.startsWith(p))) return false
+
           return true
+        } catch {
+          return false
         }
       })
 
