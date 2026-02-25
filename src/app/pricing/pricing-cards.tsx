@@ -80,46 +80,42 @@ export function PricingCards({ currentPlan, isLoggedIn }: { currentPlan: string;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      {PLANS.map((plan, i) => (
+      {PLANS.map((plan) => (
         <div
           key={plan.id}
-          className={`glass rounded-2xl p-6 relative animate-fade-in-up flex flex-col ${
-            plan.popular ? 'ring-2 ring-indigo-500/50' : ''
+          className={`glass rounded-2xl p-6 relative flex flex-col ${
+            plan.popular ? 'ring-2 ring-[#111111]/20' : ''
           }`}
-          style={{ animationDelay: `${i * 0.1}s` }}
         >
           {plan.popular && (
-            <div
-              className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
-            >
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold bg-[#111111] text-white">
               おすすめ
             </div>
           )}
 
           <div className="mb-5">
-            <h3 className="text-lg font-bold text-white mb-1">{plan.name}</h3>
+            <h3 className="text-lg font-bold text-[#111111] mb-1">{plan.name}</h3>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-white">{plan.price}</span>
-              {plan.period && <span className="text-sm text-slate-400">{plan.period}</span>}
+              <span className="text-3xl font-black text-[#111111] font-num">{plan.price}</span>
+              {plan.period && <span className="text-sm text-[#767b74]">{plan.period}</span>}
             </div>
             {plan.yearlyPrice && (
-              <p className="text-xs text-slate-500 mt-1">または {plan.yearlyPrice}（2ヶ月分お得）</p>
+              <p className="text-xs text-[#767b74] mt-1">または {plan.yearlyPrice}（2ヶ月分お得）</p>
             )}
           </div>
 
           <ul className="space-y-2.5 mb-6 flex-1">
             {plan.features.map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm text-slate-300">
-                <svg className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li key={f} className="flex items-start gap-2 text-sm text-[#323632]">
+                <svg className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 {f}
               </li>
             ))}
             {plan.limitations.map((l) => (
-              <li key={l} className="flex items-start gap-2 text-sm text-slate-500">
-                <svg className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li key={l} className="flex items-start gap-2 text-sm text-[#8a8f88]">
+                <svg className="w-4 h-4 text-[#b0b5ae] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 {l}
@@ -128,7 +124,7 @@ export function PricingCards({ currentPlan, isLoggedIn }: { currentPlan: string;
           </ul>
 
           {currentPlan === plan.id ? (
-            <div className="text-center py-2.5 rounded-xl text-sm font-medium text-indigo-400" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <div className="text-center py-2.5 rounded-xl text-sm font-medium text-[#5e625c] bg-[#f1f1ee] border border-[#d9dbd6]">
               現在のプラン
             </div>
           ) : plan.cta ? (
@@ -148,7 +144,7 @@ export function PricingCards({ currentPlan, isLoggedIn }: { currentPlan: string;
               </Link>
             )
           ) : (
-            <div className="text-center py-2.5 rounded-xl text-sm text-slate-500" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <div className="text-center py-2.5 rounded-xl text-sm text-[#8a8f88] bg-[#f7f7f5] border border-[#e3e5e0]">
               無料で利用中
             </div>
           )}

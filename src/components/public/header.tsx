@@ -66,9 +66,14 @@ export function Header() {
                 ログアウト
               </button>
             ) : (
-              <Link href="/login" className="btn-primary ml-2">
-                ログイン
-              </Link>
+              <div className="flex items-center gap-2 ml-2">
+                <Link href="/login" className="px-3 py-1.5 text-sm text-[#5e625c] hover:text-[#111] rounded-md transition-colors">
+                  ログイン
+                </Link>
+                <Link href="/login?mode=signup" className="btn-primary">
+                  無料で始める
+                </Link>
+              </div>
             )}
           </nav>
 
@@ -102,15 +107,20 @@ export function Header() {
                 {label}
               </Link>
             ))}
-            <div className="pt-2 border-t border-[#d9dbd6]">
+            <div className="pt-2 border-t border-[#d9dbd6] space-y-1">
               {user ? (
                 <button onClick={signOut} className="w-full text-left px-3 py-2 text-sm text-[#50554f] rounded-md">
                   ログアウト
                 </button>
               ) : (
-                <Link href="/login" className="block text-center btn-primary w-full">
-                  ログイン
-                </Link>
+                <>
+                  <Link href="/login" className="block px-3 py-2 text-sm text-[#50554f] rounded-md">
+                    ログイン
+                  </Link>
+                  <Link href="/login?mode=signup" className="block text-center btn-primary w-full">
+                    無料で始める
+                  </Link>
+                </>
               )}
             </div>
           </div>

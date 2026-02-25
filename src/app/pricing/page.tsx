@@ -24,21 +24,20 @@ export default async function PricingPage() {
   }
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,0.1) 0%, transparent 60%), #07070f',
-      }}
-    >
+    <div className="min-h-screen bg-[#f7f7f5]">
       <Header />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <div className="text-center mb-12 animate-fade-in-up">
-          <h1 className="text-3xl sm:text-4xl font-black text-white mb-4">
-            プラン<span className="text-gradient">・料金</span>
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5 border border-[#d9dbd6] bg-white">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1d4ed8]" />
+            <span className="text-xs font-semibold text-[#1d4ed8]">プラン・料金</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#111111] mb-4">
+            Freeプランで始めて、<br className="hidden sm:block" />必要に応じてアップグレード
           </h1>
-          <p className="text-sm sm:text-base text-slate-400 max-w-lg mx-auto">
-            Freeプランで始めて、必要に応じてアップグレード
+          <p className="text-sm sm:text-base text-[#5e625c] max-w-lg mx-auto">
+            無料でLPギャラリーと週刊ニュースレターを利用できます
           </p>
         </div>
 
