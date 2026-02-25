@@ -194,6 +194,14 @@ async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDisco
     if (!res.ok) return []
     const html = await res.text()
 
+    // フィード自身のドメインへのリンクを除外（例: producthunt.com → producthunt.comリンクを除く）
+    let feedHost = ''
+    try {
+      feedHost = new URL(feed.url).hostname.replace(/^www\./, '')
+    } catch {
+      feedHost = ''
+    }
+
     const base = new URL(itemLink)
     const rawLinks = extractLinksFromHtml(html)
     const normalized = rawLinks
@@ -208,9 +216,17 @@ async function extractCandidatesFromIntermediary(itemLink: string, feed: LPDisco
       .map((u) => normalizeUrl(u))
       .filter((u): u is string => !!u)
       .filter((u) => !u.includes('prtimes.jp'))
-      .filter((u) => !u.includes('twitter.com') && !u.includes('x.com') && !u.includes('facebook.com'))
+      .filter((u) => !u.includes('twitter.com') && !u.includes('x.com') && !u.includes('facebook.com') && !u.includes('instagram.com') && !u.includes('linkedin.com') && !u.includes('youtube.com'))
+      .filter((u) => {
+        if (!feedHost) return true
+        try {
+          return !new URL(u).hostname.replace(/^www\./, '').endsWith(feedHost)
+        } catch {
+          return true
+        }
+      })
 
-    // PR由来は重複が多いのでユニーク化
+    // 重複が多いのでユニーク化
     return Array.from(new Set(normalized))
   } catch (error) {
     console.error('Intermediary extraction failed:', feed.name, itemLink, error)
@@ -257,9 +273,9 @@ export async function runLPDiscovery(): Promise<LPDiscoveryResult> {
 
   const perFeedLimit = Number(process.env.LP_DISCOVERY_LIMIT_PER_FEED ?? '10')
   const minScore = Number(process.env.LP_DISCOVERY_MIN_SCORE ?? '70')
-  const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '55')
+  const minHeuristic = Number(process.env.LP_DISCOVERY_MIN_HEURISTIC_SCORE ?? '40')
   const jpOnly = String(process.env.LP_DISCOVERY_JP_ONLY ?? 'false').toLowerCase() === 'true'
-  const requirePerformanceSignal = String(process.env.LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL ?? 'true').toLowerCase() === 'true'
+  const requirePerformanceSignal = String(process.env.LP_DISCOVERY_REQUIRE_PERFORMANCE_SIGNAL ?? 'false').toLowerCase() === 'true'
 
   const supabase = createServiceClient({ requireServiceRole: true })
   const result: LPDiscoveryResult = {

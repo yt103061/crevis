@@ -60,6 +60,34 @@ function generateIssueHTML(title: string, issueNumber: number, articles: NLArtic
 </html>`
 }
 
+export async function autoApprovePendingArticles(scoreThreshold = 70): Promise<number> {
+  const supabase = createServiceClient({ requireServiceRole: true })
+
+  const { data: candidates, error } = await supabase
+    .from('nl_articles')
+    .select('id, relevance_score')
+    .eq('status', 'pending')
+    .gte('relevance_score', scoreThreshold)
+
+  if (error || !candidates?.length) {
+    if (error) console.error('Auto-approve query error:', error)
+    return 0
+  }
+
+  const ids = candidates.map((a) => a.id)
+  const { error: updateError } = await supabase
+    .from('nl_articles')
+    .update({ status: 'approved' })
+    .in('id', ids)
+
+  if (updateError) {
+    console.error('Auto-approve update error:', updateError)
+    return 0
+  }
+
+  return ids.length
+}
+
 export async function createIssueFromApprovedArticles() {
   const supabase = createServiceClient({ requireServiceRole: true })
 
@@ -198,6 +226,9 @@ export async function sendIssue(issueId: string) {
 }
 
 export async function runNewsletterIssueAutomation() {
+  const minRelevanceForApprove = Number(process.env.NL_AUTO_MIN_RELEVANCE ?? '70')
+  await autoApprovePendingArticles(minRelevanceForApprove)
+
   const created = await createIssueFromApprovedArticles()
 
   if (!created.created) {

@@ -22,42 +22,60 @@ export const DEFAULT_NL_SOURCES: FeedSource[] = [
   { name: 'Search Engine Land', url: 'https://searchengineland.com/feed' },
   { name: 'Ahrefs Blog', url: 'https://ahrefs.com/blog/feed/' },
 
-  // 日本の有力マーケ媒体
+  // 日本の有力マーケ・デザイン媒体
   { name: 'Web担当者Forum', url: 'https://webtan.impress.co.jp/rss.xml' },
   { name: 'MarkeZine', url: 'https://markezine.jp/rss/index.xml' },
   { name: 'LIGブログ', url: 'https://liginc.co.jp/feed' },
-  { name: 'PR TIMES テクノロジー', url: 'https://prtimes.jp/technology/rss.xml' },
-  { name: 'PR TIMES ネットサービス', url: 'https://prtimes.jp/internet/rss.xml' },
+  { name: 'ferret（マーケティング）', url: 'https://ferret-plus.com/feed' },
+  { name: 'DIGIDAY Japan', url: 'https://digiday.jp/feed/' },
+  { name: 'Smashing Magazine', url: 'https://www.smashingmagazine.com/feed/' },
+  { name: 'UX Collective', url: 'https://uxdesign.cc/feed' },
 ]
 
 // LP候補は日本市場を優先。PR記事など中間ページから外部LPを抽出する。
 export const DEFAULT_LP_DISCOVERY_FEEDS: LPDiscoveryFeed[] = [
+  // 日本のプレスリリース（中間ページから外部LP URLを抽出）
+  {
+    name: 'PR TIMES テクノロジー',
+    url: 'https://prtimes.jp/technology/rss.xml',
+    type: 'intermediary',
+    market: 'jp',
+    weight: 28,
+  },
+  {
+    name: 'PR TIMES ネットサービス',
+    url: 'https://prtimes.jp/internet/rss.xml',
+    type: 'intermediary',
+    market: 'jp',
+    weight: 28,
+  },
+  {
+    name: 'PR TIMES マーケティング',
+    url: 'https://prtimes.jp/marketing/rss.xml',
+    type: 'intermediary',
+    market: 'jp',
+    weight: 26,
+  },
+  // グローバル（中間ページから製品サイトURLを抽出）
   {
     name: 'Product Hunt',
     url: 'https://www.producthunt.com/feed',
-    type: 'direct',
+    type: 'intermediary',
     market: 'global',
     weight: 22,
   },
   {
     name: 'Indie Hackers Products',
     url: 'https://www.indiehackers.com/products.rss',
-    type: 'direct',
+    type: 'intermediary',
     market: 'global',
     weight: 20,
   },
   {
-    name: 'Hacker News',
-    url: 'https://news.ycombinator.com/rss',
+    name: 'Hacker News Show HN',
+    url: 'https://hnrss.org/show',
     type: 'direct',
     market: 'global',
     weight: 14,
-  },
-  {
-    name: 'Kickstarter Newest',
-    url: 'https://www.kickstarter.com/discover/advanced?sort=newest&format=atom',
-    type: 'direct',
-    market: 'global',
-    weight: 12,
   },
 ]
