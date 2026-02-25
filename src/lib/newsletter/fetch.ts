@@ -50,6 +50,13 @@ function normalizeUrl(raw: string): string {
   }
 }
 
+// 以前のデフォルトに含まれていたが現在は廃止されたソースURL
+// これらはDB内に残っている場合があるため、自動的に無効化する
+const RETIRED_NL_SOURCE_URLS = [
+  'https://prtimes.jp/technology/rss.xml',
+  'https://prtimes.jp/internet/rss.xml',
+]
+
 async function ensureDefaultSources() {
   const supabase = createServiceClient({ requireServiceRole: true })
 
@@ -65,6 +72,20 @@ async function ensureDefaultSources() {
 
   let seeded = 0
   let reactivated = 0
+  let retired = 0
+
+  // 廃止されたソースを無効化
+  for (const retiredUrl of RETIRED_NL_SOURCE_URLS) {
+    const key = normalizeUrl(retiredUrl)
+    const existing = byUrl.get(key)
+    if (existing?.active) {
+      await supabase
+        .from('nl_sources')
+        .update({ active: false })
+        .eq('id', existing.id)
+      retired++
+    }
+  }
 
   for (const source of DEFAULT_NL_SOURCES) {
     const key = normalizeUrl(source.url)
@@ -97,12 +118,12 @@ async function ensureDefaultSources() {
     }
   }
 
-  return { seeded, reactivated }
+  return { seeded, reactivated, retired }
 }
 
 export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
   const autoSeed = String(process.env.NL_FETCH_AUTO_SEED_SOURCES ?? 'true').toLowerCase() === 'true'
-  const seedOnEmptyOnly = String(process.env.NL_FETCH_AUTO_SEED_ON_EMPTY_ONLY ?? 'true').toLowerCase() === 'true'
+  const seedOnEmptyOnly = String(process.env.NL_FETCH_AUTO_SEED_ON_EMPTY_ONLY ?? 'false').toLowerCase() === 'true'
 
   const supabase = createServiceClient({ requireServiceRole: true })
 

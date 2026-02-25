@@ -35,26 +35,13 @@ export const DEFAULT_NL_SOURCES: FeedSource[] = [
 // LP候補は日本市場を優先。PR記事など中間ページから外部LPを抽出する。
 export const DEFAULT_LP_DISCOVERY_FEEDS: LPDiscoveryFeed[] = [
   // 日本のプレスリリース（中間ページから外部LP URLを抽出）
+  // PR TIMESのカテゴリ別RSSは存在しない。公式全件フィードのみ利用可能
   {
-    name: 'PR TIMES テクノロジー',
-    url: 'https://prtimes.jp/technology/rss.xml',
+    name: 'PR TIMES',
+    url: 'https://prtimes.jp/index.rdf',
     type: 'intermediary',
     market: 'jp',
     weight: 28,
-  },
-  {
-    name: 'PR TIMES ネットサービス',
-    url: 'https://prtimes.jp/internet/rss.xml',
-    type: 'intermediary',
-    market: 'jp',
-    weight: 28,
-  },
-  {
-    name: 'PR TIMES マーケティング',
-    url: 'https://prtimes.jp/marketing/rss.xml',
-    type: 'intermediary',
-    market: 'jp',
-    weight: 26,
   },
   // グローバル（中間ページから製品サイトURLを抽出）
   {
