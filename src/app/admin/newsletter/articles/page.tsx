@@ -36,7 +36,7 @@ export default function NLArticlesPage() {
     const data = await res.json()
     setFetching(false)
     if (res.ok) {
-      alert(`収集完了: ${data.results.processed}件追加, ${data.results.skipped}件スキップ, ${data.results.errors}件エラー`)
+      alert(`収集完了: ${data.results.processed}件追加, ${data.results.skipped}件スキップ, ${data.results.errors}件エラー\nソースエラー: ${data.results.sourceErrors ?? 0}件 / AIフォールバック: ${data.results.aiFallbacks ?? 0}件`)
       fetchArticles()
     } else {
       alert(data.error ?? '収集に失敗しました')

@@ -24,7 +24,7 @@ export function ScoreBadge({ score, label, size = 'md', className }: ScoreBadgeP
       )}
     >
       {label && <span className="opacity-70">{label}</span>}
-      <span>{score}</span>
+      <span className="font-num">{score}</span>
     </span>
   )
 }
