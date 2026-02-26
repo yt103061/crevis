@@ -69,6 +69,16 @@ export async function requireAdminAuth() {
   return user
 }
 
+// セッション cookie を JWT 検証して認証済みユーザーを返す（安全なサーバーサイド認証）
+export async function getAuthUser() {
+  const supabase = createServerSupabaseClient()
+  if (!supabase) return null
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return null
+  return user
+}
+
 // ユーザーのプランを取得
 export async function getUserPlan(userId: string): Promise<PlanType> {
   const supabase = createServiceClient()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
 import Stripe from 'stripe'
 
@@ -12,8 +12,8 @@ export async function POST() {
     return NextResponse.json({ error: 'Stripe is not configured' }, { status: 503 })
   }
 
-  const session = await getSession()
-  if (!session?.user) {
+  const user = await getAuthUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -22,7 +22,7 @@ export async function POST() {
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single()
 
     if (!profile?.stripe_customer_id) {
