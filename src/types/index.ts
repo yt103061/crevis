@@ -13,6 +13,9 @@ export interface LP {
   ad_platform: string | null
   status: LPStatus
   created_at: string
+  lp_confidence_score?: number | null
+  is_likely_lp?: boolean | null
+  candidate_id?: string | null
 }
 
 export interface LPAnalysis {
@@ -28,6 +31,49 @@ export interface LPAnalysis {
   why_it_works: string
   target_match: string
   analyzed_at: string
+}
+
+export interface LPPageFeatures {
+  isLikelyLP: boolean
+  lpConfidenceScore: number
+  totalSections: number
+  pageHeightRatio: number
+  navLinkCount: number
+  externalLinkCount: number
+  internalLinkCount: number
+  ctaButtons: string[]
+  formFieldCount: number
+  hasMainForm: boolean
+  h1Text: string
+  h2Texts: string[]
+  metaDescription: string
+  metaTitle: string
+  mainCopySnippets: string[]
+  hasSocialProof: boolean
+  hasTestimonials: boolean
+  hasFAQ: boolean
+  hasPricing: boolean
+  hasNoIndex: boolean
+  ogType: string | null
+  canonicalUrl: string | null
+  totalImageCount: number
+  hasVideo: boolean
+}
+
+export interface LPCandidate {
+  id: string
+  url: string
+  source_type: string
+  source_name: string | null
+  discovered_at: string
+  lp_confidence_score: number | null
+  is_likely_lp: boolean | null
+  page_title: string | null
+  page_domain: string | null
+  status: 'new' | 'reviewed' | 'accepted' | 'rejected' | 'auto_accepted'
+  rejection_reason: string | null
+  reviewed_at: string | null
+  created_at: string
 }
 
 export interface LPWithAnalysis extends LP {
@@ -51,6 +97,7 @@ export interface NLSource {
   active: boolean
   last_fetched_at: string | null
   created_at: string
+  scrape_config?: Record<string, unknown> | null
 }
 
 export interface NLArticle {
@@ -63,8 +110,12 @@ export interface NLArticle {
   translated_title_ja: string | null
   key_insights: string[] | null
   relevance_score: number | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'auto_rejected'
   fetched_at: string
+  evidence_level?: 'high' | 'medium' | 'low' | null
+  actionable_tips?: string[] | null
+  content_length?: number | null
+  extraction_method?: string | null
 }
 
 export interface NewsletterIssue {
@@ -128,4 +179,6 @@ export interface ArticleOutput {
   summary_ja: string
   key_insights: string[]
   relevance_score: number
+  evidence_level: 'high' | 'medium' | 'low'
+  actionable_tips: string[]
 }
