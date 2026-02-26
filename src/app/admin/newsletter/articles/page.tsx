@@ -31,6 +31,7 @@ export default function NLArticlesPage() {
   const [bulkApproving, setBulkApproving] = useState(false)
   const [statusFilter, setStatusFilter] = useState('pending')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [showContent, setShowContent] = useState<string | null>(null)
 
   useEffect(() => {
     loadArticles()
@@ -262,7 +263,7 @@ export default function NLArticlesPage() {
                           {article.key_insights && article.key_insights.length > 0 && (
                             <div>
                               <p className="text-xs font-medium text-[#5e625c] mb-1">インサイト</p>
-                              <ul className="space-y-0.5">
+                              <ul className="space-y-1">
                                 {article.key_insights.map((insight, i) => (
                                   <li key={i} className="text-xs text-[#767b74] flex items-start gap-1">
                                     <span className="text-[#1d4ed8] mt-0.5 shrink-0">•</span>
@@ -275,7 +276,7 @@ export default function NLArticlesPage() {
                           {article.actionable_tips && article.actionable_tips.length > 0 && (
                             <div>
                               <p className="text-xs font-medium text-[#5e625c] mb-1">実践Tips</p>
-                              <ul className="space-y-0.5">
+                              <ul className="space-y-1">
                                 {article.actionable_tips.map((tip, i) => (
                                   <li key={i} className="text-xs text-[#767b74] flex items-start gap-1">
                                     <span className="text-emerald-600 mt-0.5 shrink-0">✓</span>
@@ -285,10 +286,30 @@ export default function NLArticlesPage() {
                               </ul>
                             </div>
                           )}
-                          {article.content_length != null && (
+
+                          {/* 取得本文の表示 */}
+                          {article.original_content && (
+                            <div>
+                              <button
+                                onClick={() => setShowContent(showContent === article.id ? null : article.id)}
+                                className="text-xs text-[#767b74] hover:text-[#111111] flex items-center gap-1"
+                              >
+                                <span>{showContent === article.id ? '本文を閉じる ▲' : '取得本文を確認 ▼'}</span>
+                                {article.content_length != null && (
+                                  <span className="text-[#8a8f88]">({article.content_length.toLocaleString()}字{article.extraction_method === 'scrape' ? '・全文' : '・RSSサマリー'})</span>
+                                )}
+                              </button>
+                              {showContent === article.id && (
+                                <div className="mt-1.5 p-3 bg-[#f7f8f6] border border-[#e4e5e1] rounded-lg max-h-64 overflow-y-auto">
+                                  <p className="text-xs text-[#5e625c] leading-relaxed whitespace-pre-wrap">{article.original_content}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {article.content_length == null && (
                             <p className="text-xs text-[#8a8f88]">
-                              本文文字数: {article.content_length.toLocaleString()}字
-                              {article.extraction_method && ` (${article.extraction_method === 'scrape' ? 'フルテキスト取得' : 'RSSサマリー'})`}
+                              {article.extraction_method === 'scrape' ? 'フルテキスト取得' : 'RSSサマリー'}
                             </p>
                           )}
                         </div>
@@ -304,9 +325,16 @@ export default function NLArticlesPage() {
                         >
                           元記事を見る →
                         </a>
-                        {(article.key_insights?.length || article.actionable_tips?.length) ? (
+                        {(article.key_insights?.length || article.actionable_tips?.length || article.original_content) ? (
                           <button
-                            onClick={() => setExpanded(isExpanded ? null : article.id)}
+                            onClick={() => {
+                              if (isExpanded) {
+                                setExpanded(null)
+                                setShowContent(null)
+                              } else {
+                                setExpanded(article.id)
+                              }
+                            }}
                             className="text-xs text-[#767b74] hover:text-[#111111]"
                           >
                             {isExpanded ? '閉じる ▲' : '詳細を見る ▼'}

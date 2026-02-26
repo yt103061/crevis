@@ -177,29 +177,46 @@ JSONのみを返してください。説明文は不要です。`
 }
 
 function buildArticlePrompt(input: ArticleInput): string {
-  return `以下の記事を日本のWebデザイナー・Webマーケター向けに日本語で要約してください。
+  return `あなたはCRO（コンバージョン率最適化）とUX設計の専門家として、以下の記事を分析してください。
+あなたは日本のWebマーケター・LP制作者・Webデザイナー向けの高品質なニュースレターを執筆しており、ニールセン・ノーマン・グループやCXLのニュースレターに匹敵する深度の洞察を提供する役割を担っています。
 
+【記事情報】
 タイトル: ${input.original_title}
-本文: ${input.original_content.slice(0, 5000)}
+本文:
+${input.original_content.slice(0, 8000)}
 
-relevance_score採点基準（CRO/LP改善への関連性）:
+【分析指針】
+単なる情報の要約ではなく、「なぜこれが重要か」「従来の通説と何が違うか」「日本のLP現場でどう解釈すべきか」を専門家の視点で深掘りしてください。
+
+■ summary_ja（450〜600字）:
+記事の核心的な発見・主張を、背景・意義・示唆も含めて解説する。数値やデータは具体的に引用する。
+「この研究が興味深いのは〜」「見落とされがちなポイントは〜」「従来の定説に対して〜」といった専門家コメンタリーを加え、情報の意味を能動的に解釈して書く。単なる事実列挙ではなく編集的視点を持つこと。
+
+■ key_insights（4〜6件、各インサイトは50〜100字の1〜2文）:
+表面的な事実の裏にある意味・構造・因果関係を掘り下げる。
+「〜だから〜が成立する」「〜という誤解が多いが実際は〜」「〜のケースに限定すると〜」という形で、なぜそうなのかの理由・背景まで言及する。可能な場合は記事内の数値や実験を引用する。
+
+■ actionable_tips（3〜5件）:
+日本のLPやWebサイトで明日から実施できる具体的な施策。「〇〇セクションで〜を試す」「ABテスト仮説として〜を設定する」「〜というコピーパターンを採用する」など、どのページ要素に・どう適用するかを明記する。汎用的なアドバイスは避け、LP制作・CROの現場に直結させる。
+
+■ relevance_score採点基準（CRO/LP改善への関連性）:
 - 80-100: 直接役立つ（CVR改善・A/Bテスト・LPコピーライティング・フォーム最適化・ヒートマップ・ユーザー行動分析・説得デザイン等）
 - 50-79: 間接的に参考になる（一般UX設計・マーケ戦略・説得心理学・データ分析・SEO・コンテンツ戦略等）
 - 0-49: 関連性が低い（一般ニュース・無関係な技術・企業プレスリリース・業界動向一般等）
 
-evidence_level基準:
+■ evidence_level基準:
 - "high": 統計データ・実験結果・査読論文・大規模調査あり
 - "medium": 事例研究・専門家意見・限定的データあり
 - "low": 意見・推測・一般論のみ
 
 返却JSON形式:
 {
-  "translated_title_ja": "日本語タイトル",
-  "summary_ja": "200字程度の日本語要約",
-  "key_insights": ["インサイト1", "インサイト2", "インサイト3"],
+  "translated_title_ja": "日本語タイトル（原題のニュアンスを活かしつつ自然な日本語に）",
+  "summary_ja": "450〜600字の深い専門家分析",
+  "key_insights": ["インサイト1（50〜100字）", "インサイト2", "インサイト3", "インサイト4"],
   "relevance_score": 0-100,
   "evidence_level": "high" | "medium" | "low",
-  "actionable_tips": ["すぐ実践できるTip1", "Tip2"]
+  "actionable_tips": ["具体的施策1", "施策2", "施策3"]
 }
 
 JSONのみを返してください。説明文は不要です。`
@@ -220,7 +237,7 @@ async function callClaude(prompt: string): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
   const message = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
+    max_tokens: 2048,
     messages: [{ role: 'user', content: prompt }],
   })
   return (message.content[0] as { text: string }).text
