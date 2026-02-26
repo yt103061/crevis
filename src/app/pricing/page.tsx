@@ -23,6 +23,11 @@ export default async function PricingPage() {
     currentPlan = profile?.plan ?? 'free'
   }
 
+  const priceIds = {
+    reader: process.env.STRIPE_READER_PRICE_ID ?? null,
+    pro: process.env.STRIPE_PRO_PRICE_ID ?? null,
+  }
+
   return (
     <div className="min-h-screen bg-[#f7f7f5]">
       <Header />
@@ -41,7 +46,7 @@ export default async function PricingPage() {
           </p>
         </div>
 
-        <PricingCards currentPlan={currentPlan} isLoggedIn={!!session} />
+        <PricingCards currentPlan={currentPlan} isLoggedIn={!!session} priceIds={priceIds} />
       </div>
     </div>
   )

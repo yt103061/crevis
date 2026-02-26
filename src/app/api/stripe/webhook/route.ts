@@ -6,6 +6,12 @@ function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion })
 }
 
+function planFromPriceId(priceId: string): string {
+  if (priceId === process.env.STRIPE_READER_PRICE_ID) return 'reader'
+  if (priceId === process.env.STRIPE_PRO_PRICE_ID) return 'pro'
+  return 'pro' // フォールバック
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
@@ -25,14 +31,22 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient()
 
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object as Stripe.Checkout.Session
-      const userId = session.metadata?.supabase_user_id
-      const plan = session.metadata?.plan ?? 'pro'
-      const subscriptionId = session.subscription as string
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        const userId = session.metadata?.supabase_user_id
+        const subscriptionId = session.subscription as string
 
-      if (userId) {
+        if (!userId) break
+
+        // subscription を expand して price ID からプランを判定
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ['items.data.price'],
+        })
+        const priceId = subscription.items.data[0]?.price?.id
+        const plan = priceId ? planFromPriceId(priceId) : (session.metadata?.plan ?? 'pro')
+
         await supabase
           .from('profiles')
           .update({
@@ -41,43 +55,47 @@ export async function POST(request: NextRequest) {
             stripe_subscription_id: subscriptionId,
           })
           .eq('id', userId)
+        break
       }
-      break
-    }
 
-    case 'customer.subscription.updated': {
-      const subscription = event.data.object as Stripe.Subscription
-      const customerId = subscription.customer as string
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
+        const priceId = subscription.items.data[0]?.price?.id
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('stripe_customer_id', customerId)
-        .single()
-
-      if (profile) {
         const isActive = ['active', 'trialing'].includes(subscription.status)
+        const plan = isActive && priceId ? planFromPriceId(priceId) : 'free'
+
         await supabase
           .from('profiles')
           .update({
-            plan: isActive ? (profile as { plan?: string }).plan ?? 'pro' : 'free',
+            plan,
             stripe_subscription_id: subscription.id,
           })
-          .eq('id', profile.id)
+          .eq('stripe_customer_id', customerId)
+        break
       }
-      break
-    }
 
-    case 'customer.subscription.deleted': {
-      const subscription = event.data.object as Stripe.Subscription
-      const customerId = subscription.customer as string
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
 
-      await supabase
-        .from('profiles')
-        .update({ plan: 'free', stripe_subscription_id: null })
-        .eq('stripe_customer_id', customerId)
-      break
+        await supabase
+          .from('profiles')
+          .update({ plan: 'free', stripe_subscription_id: null })
+          .eq('stripe_customer_id', customerId)
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        console.error('[Stripe] Payment failed for customer:', invoice.customer, 'invoice:', invoice.id)
+        break
+      }
     }
+  } catch (err) {
+    console.error('[Stripe webhook] Handler error:', err)
+    // 200 を返して Stripe のリトライを防ぐ（冪等性確保）
   }
 
   return NextResponse.json({ received: true })

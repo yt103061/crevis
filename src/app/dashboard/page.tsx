@@ -5,6 +5,7 @@ import type { LPWithAnalysis, Collection } from '@/types'
 import { Header } from '@/components/public/header'
 import { LPCard } from '@/components/public/lp-card'
 import Link from 'next/link'
+import { PlanManager } from './plan-manager'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,13 @@ export const metadata = {
   title: 'コレクション',
 }
 
+const PLAN_LABEL: Record<string, string> = {
+  free: 'Free',
+  reader: 'Reader',
+  pro: 'Pro',
+  team: 'Team',
+}
+
 export default async function DashboardPage() {
   const session = await getSession()
   if (!session) {
@@ -23,19 +31,57 @@ export default async function DashboardPage() {
   }
 
   const supabase = createServiceClient()
-  const { data: collections } = await supabase
-    .from('collections')
-    .select('*, lps(*, lp_analyses(*))')
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
+  const [{ data: collections }, { data: profile }] = await Promise.all([
+    supabase
+      .from('collections')
+      .select('*, lps(*, lp_analyses(*))')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('profiles')
+      .select('plan, stripe_customer_id')
+      .eq('id', session.user.id)
+      .single(),
+  ])
 
   const items = (collections as CollectionWithLP[]) ?? []
+  const currentPlan = (profile?.plan ?? 'free') as string
+  const hasStripeCustomer = !!profile?.stripe_customer_id
+
+  const checkoutSuccess = false // サーバー側ではURLパラメータ不可のためクライアントで処理
 
   return (
     <div className="min-h-screen bg-[#f7f7f5]">
       <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        {/* プラン管理セクション */}
+        <div className="glass rounded-2xl p-5 mb-8">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-xs text-[#767b74] mb-0.5">現在のプラン</p>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    currentPlan === 'pro' || currentPlan === 'team'
+                      ? 'bg-[#eef2ff] text-[#1d4ed8]'
+                      : currentPlan === 'reader'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-[#f1f1ee] text-[#5e625c]'
+                  }`}>
+                    {PLAN_LABEL[currentPlan] ?? currentPlan}
+                  </span>
+                  {checkoutSuccess && (
+                    <span className="text-xs text-emerald-600 font-medium">アップグレード完了！</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <PlanManager currentPlan={currentPlan} hasStripeCustomer={hasStripeCustomer} />
+          </div>
+        </div>
+
+        {/* コレクション */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-[#111111]">コレクション</h1>

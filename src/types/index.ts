@@ -1,5 +1,7 @@
 export type LPStatus = 'active' | 'archived' | 'takedown'
 
+export type PlanType = 'free' | 'reader' | 'pro' | 'team'
+
 export interface LP {
   id: string
   url: string
@@ -127,7 +129,7 @@ export interface NewsletterSubscriber {
 export interface Profile {
   id: string
   email: string | null
-  plan: 'free' | 'pro' | 'team'
+  plan: PlanType
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   created_at: string
