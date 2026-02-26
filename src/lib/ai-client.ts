@@ -122,10 +122,32 @@ function buildLPAnalysisPrompt(input: LPAnalysisInput, pageContent: string): str
     ? `\nページ内容:\n${pageContent}\n`
     : '\n（ページ内容の取得に失敗しました。URLから可能な範囲で推測してください）\n'
 
+  // ページ構造情報をプロンプトに追加
+  let structureSection = ''
+  if (input.pageFeatures) {
+    const f = input.pageFeatures
+    structureSection = `
+ページ構造情報（自動抽出）:
+- LPらしさスコア: ${f.lpConfidenceScore}/100
+- H1見出し: ${f.h1Text || '(なし)'}
+- H2見出し: ${f.h2Texts.slice(0, 5).join(' / ') || '(なし)'}
+- CTAボタン: ${f.ctaButtons.slice(0, 5).join(' / ') || '(なし)'}
+- フォーム有無: ${f.hasMainForm ? `あり（${f.formFieldCount}フィールド）` : 'なし'}
+- ナビリンク数: ${f.navLinkCount}
+- ソーシャルプルーフ: ${f.hasSocialProof ? 'あり' : 'なし'}
+- 口コミ/事例: ${f.hasTestimonials ? 'あり' : 'なし'}
+- FAQ: ${f.hasFAQ ? 'あり' : 'なし'}
+- 料金プラン: ${f.hasPricing ? 'あり' : 'なし'}
+- 動画: ${f.hasVideo ? 'あり' : 'なし'}
+- OGタイプ: ${f.ogType || '(未設定)'}
+- メタ説明: ${f.metaDescription || '(なし)'}
+`
+  }
+
   return `以下のランディングページを分析し、JSON形式で返してください。
 
 URL: ${input.url}
-${contentSection}
+${contentSection}${structureSection}
 業界・目的・ターゲットオーディエンスはページ内容から推論してください。
 
 採点基準:
@@ -158,19 +180,26 @@ function buildArticlePrompt(input: ArticleInput): string {
   return `以下の記事を日本のWebデザイナー・Webマーケター向けに日本語で要約してください。
 
 タイトル: ${input.original_title}
-本文: ${input.original_content.slice(0, 3000)}
+本文: ${input.original_content.slice(0, 5000)}
 
 relevance_score採点基準（CRO/LP改善への関連性）:
 - 80-100: 直接役立つ（CVR改善・A/Bテスト・LPコピーライティング・フォーム最適化・ヒートマップ・ユーザー行動分析・説得デザイン等）
 - 50-79: 間接的に参考になる（一般UX設計・マーケ戦略・説得心理学・データ分析・SEO・コンテンツ戦略等）
 - 0-49: 関連性が低い（一般ニュース・無関係な技術・企業プレスリリース・業界動向一般等）
 
+evidence_level基準:
+- "high": 統計データ・実験結果・査読論文・大規模調査あり
+- "medium": 事例研究・専門家意見・限定的データあり
+- "low": 意見・推測・一般論のみ
+
 返却JSON形式:
 {
   "translated_title_ja": "日本語タイトル",
   "summary_ja": "200字程度の日本語要約",
   "key_insights": ["インサイト1", "インサイト2", "インサイト3"],
-  "relevance_score": 0-100
+  "relevance_score": 0-100,
+  "evidence_level": "high" | "medium" | "low",
+  "actionable_tips": ["すぐ実践できるTip1", "Tip2"]
 }
 
 JSONのみを返してください。説明文は不要です。`

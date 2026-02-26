@@ -1,5 +1,8 @@
 import { createServiceClient } from '@/lib/supabase'
 import { processNewsletterArticle } from '@/lib/ai-client'
+import { extractArticleText } from '@/lib/article-extractor'
+import { filterArticle, AUTO_REJECT_SCORE_THRESHOLD } from '@/lib/article-filter'
+import { acquireRateLimit, extractDomain } from '@/lib/rate-limiter'
 import RSSParser from 'rss-parser'
 import { DEFAULT_NL_SOURCES } from '@/lib/automation/default-feeds'
 
@@ -14,11 +17,10 @@ export interface NewsletterFetchResult {
   errors: number
   sourceErrors: number
   aiFallbacks: number
+  autoRejected: number
   /** フェッチに失敗したソースの詳細（"ソース名: エラー内容" 形式） */
   source_error_details: string[]
 }
-
-
 
 async function parseFeedWithFallback(url: string) {
   try {
@@ -53,7 +55,6 @@ function normalizeUrl(raw: string): string {
 }
 
 // 以前のデフォルトに含まれていたが現在は廃止されたソースURL
-// これらはDB内に残っている場合があるため、自動的に無効化する
 const RETIRED_NL_SOURCE_URLS = [
   'https://prtimes.jp/technology/rss.xml',
   'https://prtimes.jp/internet/rss.xml',
@@ -76,7 +77,6 @@ async function ensureDefaultSources() {
   let reactivated = 0
   let retired = 0
 
-  // 廃止されたソースを無効化
   for (const retiredUrl of RETIRED_NL_SOURCE_URLS) {
     const key = normalizeUrl(retiredUrl)
     const existing = byUrl.get(key)
@@ -151,7 +151,15 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
     throw new Error('No active sources found')
   }
 
-  const results: NewsletterFetchResult = { processed: 0, skipped: 0, errors: 0, sourceErrors: 0, aiFallbacks: 0, source_error_details: [] }
+  const results: NewsletterFetchResult = {
+    processed: 0,
+    skipped: 0,
+    errors: 0,
+    sourceErrors: 0,
+    aiFallbacks: 0,
+    autoRejected: 0,
+    source_error_details: [],
+  }
 
   for (const source of sources) {
     try {
@@ -173,19 +181,53 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
           continue
         }
 
-        const content = item.contentSnippet ?? (item as { 'content:encoded'?: string })['content:encoded'] ?? item.content ?? item.summary ?? ''
+        const rssContent = item.contentSnippet ?? (item as { 'content:encoded'?: string })['content:encoded'] ?? item.content ?? item.summary ?? ''
+        const title = item.title ?? ''
 
+        // Stage 1: 事前フィルタリング（明らかに無関係な記事を除外）
+        const filterResult = filterArticle(title, rssContent)
+        if (!filterResult.pass) {
+          // 自動却下（DBには保存してトレース可能にする）
+          await supabase.from('nl_articles').insert({
+            source_id: source.id,
+            original_url: normalizedLink,
+            original_title: title,
+            original_content: rssContent.slice(0, 1000),
+            status: 'auto_rejected',
+            relevance_score: 0,
+            extraction_method: 'rss',
+            content_length: rssContent.length,
+          })
+          results.autoRejected++
+          continue
+        }
+
+        // Stage 2: フルテキスト抽出（レートリミット適用）
+        const domain = extractDomain(normalizedLink)
+        await acquireRateLimit(domain, 5)
+
+        const extracted = await extractArticleText(normalizedLink, rssContent)
+        const content = extracted.text || rssContent
+
+        // Stage 3: AI処理
         let aiResult: {
           summary_ja: string | null
           translated_title_ja: string | null
           key_insights: string[]
           relevance_score: number | null
+          evidence_level: 'high' | 'medium' | 'low' | null
+          actionable_tips: string[] | null
         }
         try {
-          aiResult = await processNewsletterArticle({
-            original_title: item.title ?? '',
+          const rawResult = await processNewsletterArticle({
+            original_title: title,
             original_content: content,
           })
+          aiResult = {
+            ...rawResult,
+            evidence_level: rawResult.evidence_level ?? null,
+            actionable_tips: rawResult.actionable_tips ?? null,
+          }
         } catch (aiError) {
           console.error('AI processing failed for:', normalizedLink, aiError)
           results.aiFallbacks++
@@ -194,26 +236,43 @@ export async function runNewsletterFetch(): Promise<NewsletterFetchResult> {
             translated_title_ja: null,
             key_insights: [],
             relevance_score: null,
+            evidence_level: null,
+            actionable_tips: null,
           }
+        }
+
+        // Stage 4: DB保存
+        // スコアが低い場合は auto_rejected として保存
+        const status =
+          aiResult.relevance_score !== null && aiResult.relevance_score < AUTO_REJECT_SCORE_THRESHOLD
+            ? 'auto_rejected'
+            : 'pending'
+
+        if (status === 'auto_rejected') {
+          results.autoRejected++
         }
 
         const { error: insertError } = await supabase.from('nl_articles').insert({
           source_id: source.id,
           original_url: normalizedLink,
-          original_title: item.title ?? '',
+          original_title: title,
           original_content: content.slice(0, 5000),
           summary_ja: aiResult.summary_ja,
           translated_title_ja: aiResult.translated_title_ja,
           key_insights: aiResult.key_insights,
           relevance_score: aiResult.relevance_score,
-          status: 'pending',
+          evidence_level: aiResult.evidence_level,
+          actionable_tips: aiResult.actionable_tips,
+          content_length: content.length,
+          extraction_method: extracted.method,
+          status,
         })
 
         if (insertError) {
           console.error('Failed to insert article:', insertError)
           results.errors++
         } else {
-          results.processed++
+          if (status === 'pending') results.processed++
         }
       }
 
