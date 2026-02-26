@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import Stripe from 'stripe'
 
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion })
-}
-
 function planFromPriceId(priceId: string): string {
   if (priceId === process.env.STRIPE_READER_PRICE_ID) return 'reader'
   if (priceId === process.env.STRIPE_PRO_PRICE_ID) return 'pro'
@@ -16,14 +12,25 @@ export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
 
-  if (!signature || !process.env.STRIPE_WEBHOOK_SECRET || !process.env.STRIPE_SECRET_KEY) {
+  // 環境変数を毎回 process.env から取得（Vercel キャッシュ対策）
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
+  const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
+
+  if (!signature || !stripeWebhookSecret || !stripeSecretKey) {
+    console.error('Missing Stripe env vars:', {
+      hasSecretKey: !!stripeSecretKey,
+      hasWebhookSecret: !!stripeWebhookSecret,
+      hasSignature: !!signature,
+    })
     return NextResponse.json({ error: 'Stripe not configured' }, { status: 400 })
   }
 
-  const stripe = getStripe()
+  // webhook は raw body 検証が必要なため、ここで直接インスタンス化する
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion })
+
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET)
+    event = stripe.webhooks.constructEvent(body, signature, stripeWebhookSecret)
   } catch (err) {
     console.error('Webhook signature verification failed:', err)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
