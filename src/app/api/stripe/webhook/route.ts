@@ -3,9 +3,60 @@ import { createServiceClient } from '@/lib/supabase'
 import Stripe from 'stripe'
 
 function planFromPriceId(priceId: string): string {
-  if (priceId === process.env.STRIPE_READER_PRICE_ID) return 'reader'
-  if (priceId === process.env.STRIPE_PRO_PRICE_ID) return 'pro'
+  const readerPriceId = process.env.STRIPE_READER_PRICE_ID?.trim()
+  const proPriceId = process.env.STRIPE_PRO_PRICE_ID?.trim()
+  console.log('planFromPriceId:', {
+    priceId,
+    readerPriceId,
+    proPriceId,
+    matchReader: priceId === readerPriceId,
+    matchPro: priceId === proPriceId,
+  })
+  if (priceId === readerPriceId) return 'reader'
+  if (priceId === proPriceId) return 'pro'
   return 'pro' // フォールバック
+}
+
+// stripe_customer_id → なければ Stripe から email 取得 → email で検索
+async function findProfileByCustomer(
+  supabase: ReturnType<typeof createServiceClient>,
+  stripe: Stripe,
+  customerId: string
+): Promise<{ id: string } | null> {
+  // パターン a: stripe_customer_id で検索
+  const { data: byCustomerId, error: e1 } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle()
+
+  console.log('findProfileByCustomer (by customer_id):', { customerId, found: !!byCustomerId, error: e1?.message })
+
+  if (byCustomerId) return byCustomerId
+
+  // パターン b: Stripe の customer オブジェクトから email を取得して検索
+  try {
+    const customer = await stripe.customers.retrieve(customerId)
+    if (customer.deleted) {
+      console.error('findProfileByCustomer: customer is deleted', customerId)
+      return null
+    }
+    const email = (customer as Stripe.Customer).email
+    console.log('findProfileByCustomer (fallback email):', { customerId, email })
+    if (!email) return null
+
+    const { data: byEmail, error: e2 } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    console.log('findProfileByCustomer (by email):', { email, found: !!byEmail, error: e2?.message })
+    return byEmail ?? null
+  } catch (err) {
+    console.error('findProfileByCustomer: stripe.customers.retrieve failed:', err)
+    return null
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -53,46 +104,67 @@ export async function POST(request: NextRequest) {
           metadata: session.metadata,
         })
 
-        const email = session.customer_details?.email ?? session.customer_email
-        if (!email) {
-          console.error('[Stripe webhook] No email found in checkout session')
-          break
-        }
-
         const subscriptionId = typeof session.subscription === 'string'
           ? session.subscription
           : null
 
-        let planType = 'pro'
+        // プラン判定: metadata.plan を優先し、なければ subscription の price ID から判定
+        let planType: string = session.metadata?.plan ?? 'pro'
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-          const priceId = subscription.items.data[0]?.price?.id
+          const sub = await stripe.subscriptions.retrieve(subscriptionId)
+          const priceId = sub.items.data[0]?.price?.id
           console.log('Price ID from subscription:', priceId)
           if (priceId) {
             planType = planFromPriceId(priceId)
           }
         }
 
-        console.log('Updating profile:', {
-          email,
-          planType,
-          customer: session.customer,
-          subscriptionId,
-        })
+        const customerId = typeof session.customer === 'string' ? session.customer : null
 
-        const { error: updateError } = await supabase
+        // 更新対象の特定: supabase_user_id があれば直接 id で更新（最も確実）
+        const userId = session.metadata?.supabase_user_id
+        if (userId) {
+          console.log('Updating profile by user_id:', { userId, planType, customerId, subscriptionId })
+          const { data, error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              plan: planType,
+              ...(customerId ? { stripe_customer_id: customerId } : {}),
+              stripe_subscription_id: subscriptionId,
+            })
+            .eq('id', userId)
+            .select('id, plan')
+
+          if (updateError) {
+            console.error('[Stripe webhook] checkout update by user_id failed:', updateError)
+          } else {
+            console.log('[Stripe webhook] checkout updated by user_id:', data)
+          }
+          break
+        }
+
+        // フォールバック: email で検索
+        const email = session.customer_details?.email ?? session.customer_email
+        if (!email) {
+          console.error('[Stripe webhook] No user_id or email found in checkout session')
+          break
+        }
+
+        console.log('Updating profile by email:', { email, planType, customerId, subscriptionId })
+        const { data, error: updateError } = await supabase
           .from('profiles')
           .update({
             plan: planType,
-            stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
+            ...(customerId ? { stripe_customer_id: customerId } : {}),
             stripe_subscription_id: subscriptionId,
           })
           .eq('email', email)
+          .select('id, plan')
 
         if (updateError) {
-          console.error('[Stripe webhook] Profile update failed:', updateError)
+          console.error('[Stripe webhook] checkout update by email failed:', updateError)
         } else {
-          console.log('[Stripe webhook] Profile updated successfully to:', planType)
+          console.log('[Stripe webhook] checkout updated by email:', data)
         }
         break
       }
@@ -105,18 +177,30 @@ export async function POST(request: NextRequest) {
         const isActive = ['active', 'trialing'].includes(subscription.status)
         const plan = isActive && priceId ? planFromPriceId(priceId) : 'free'
 
-        console.log('customer.subscription.updated:', { customerId, priceId, plan, status: subscription.status })
+        console.log('customer.subscription.updated:', {
+          customerId,
+          priceId,
+          plan,
+          status: subscription.status,
+          isActive,
+        })
 
-        const { error: updateError } = await supabase
+        const profile = await findProfileByCustomer(supabase, stripe, customerId)
+        if (!profile) {
+          console.error('[Stripe webhook] subscription.updated: profile not found for customer', customerId)
+          break
+        }
+
+        const { data, error: updateError } = await supabase
           .from('profiles')
-          .update({
-            plan,
-            stripe_subscription_id: subscription.id,
-          })
-          .eq('stripe_customer_id', customerId)
+          .update({ plan, stripe_customer_id: customerId, stripe_subscription_id: subscription.id })
+          .eq('id', profile.id)
+          .select('id, plan')
 
         if (updateError) {
-          console.error('[Stripe webhook] subscription.updated profile update failed:', updateError)
+          console.error('[Stripe webhook] subscription.updated update failed:', updateError)
+        } else {
+          console.log('[Stripe webhook] subscription.updated success:', data)
         }
         break
       }
@@ -127,13 +211,22 @@ export async function POST(request: NextRequest) {
 
         console.log('customer.subscription.deleted:', { customerId })
 
-        const { error: updateError } = await supabase
+        const profile = await findProfileByCustomer(supabase, stripe, customerId)
+        if (!profile) {
+          console.error('[Stripe webhook] subscription.deleted: profile not found for customer', customerId)
+          break
+        }
+
+        const { data, error: updateError } = await supabase
           .from('profiles')
           .update({ plan: 'free', stripe_subscription_id: null })
-          .eq('stripe_customer_id', customerId)
+          .eq('id', profile.id)
+          .select('id, plan')
 
         if (updateError) {
-          console.error('[Stripe webhook] subscription.deleted profile update failed:', updateError)
+          console.error('[Stripe webhook] subscription.deleted update failed:', updateError)
+        } else {
+          console.log('[Stripe webhook] subscription.deleted reset to free:', data)
         }
         break
       }
