@@ -5,9 +5,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import type { PlanType } from '@/types'
+
+const PLAN_BADGE: Record<PlanType, { label: string; cls: string } | null> = {
+  free: null,
+  reader: { label: 'Reader', cls: 'bg-[#eef2ff] text-[#1d4ed8]' },
+  pro: { label: 'Pro', cls: 'bg-amber-100 text-amber-700' },
+  team: { label: 'Team', cls: 'bg-amber-100 text-amber-700' },
+}
 
 export function Header() {
-  const [user, setUser] = useState<{ email?: string } | null>(null)
+  const [user, setUser] = useState<{ email?: string; id?: string } | null>(null)
+  const [plan, setPlan] = useState<PlanType>('free')
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
 
@@ -16,13 +25,30 @@ export function Header() {
 
     ;(async () => {
       const { data } = await supabase.auth.getUser()
-      if (mounted) setUser(data.user ? { email: data.user.email } : null)
+      if (!mounted) return
+      if (data.user) {
+        setUser({ email: data.user.email, id: data.user.id })
+        // Fetch plan from profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', data.user.id)
+          .maybeSingle()
+        if (mounted && profile?.plan) setPlan(profile.plan as PlanType)
+      } else {
+        setUser(null)
+      }
     })()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ? { email: session.user.email } : null)
+      if (session?.user) {
+        setUser({ email: session.user.email, id: session.user.id })
+      } else {
+        setUser(null)
+        setPlan('free')
+      }
     })
 
     return () => {
@@ -59,12 +85,26 @@ export function Header() {
               </NavLink>
             ))}
             {user ? (
-              <button
-                onClick={signOut}
-                className="ml-2 px-3 py-1.5 text-sm text-[#6b7068] hover:text-[#111] rounded-md"
-              >
-                ログアウト
-              </button>
+              <div className="flex items-center gap-2 ml-2">
+                {(() => {
+                  const badge = PLAN_BADGE[plan]
+                  return badge ? (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                  ) : (
+                    <Link href="/pricing" className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#f1f1ee] text-[#5e625c] hover:bg-[#eef2ff] hover:text-[#1d4ed8] transition-colors">
+                      アップグレード
+                    </Link>
+                  )
+                })()}
+                <button
+                  onClick={signOut}
+                  className="px-3 py-1.5 text-sm text-[#6b7068] hover:text-[#111] rounded-md"
+                >
+                  ログアウト
+                </button>
+              </div>
             ) : (
               <div className="flex items-center gap-2 ml-2">
                 <Link href="/login" className="px-3 py-1.5 text-sm text-[#5e625c] hover:text-[#111] rounded-md transition-colors">
@@ -109,9 +149,25 @@ export function Header() {
             ))}
             <div className="pt-2 border-t border-[#d9dbd6] space-y-1">
               {user ? (
-                <button onClick={signOut} className="w-full text-left px-3 py-2 text-sm text-[#50554f] rounded-md">
-                  ログアウト
-                </button>
+                <>
+                  {(() => {
+                    const badge = PLAN_BADGE[plan]
+                    return badge ? (
+                      <div className="px-3 py-1.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.cls}`}>
+                          {badge.label}プラン
+                        </span>
+                      </div>
+                    ) : (
+                      <Link href="/pricing" className="block px-3 py-2 text-sm text-[#1d4ed8] rounded-md">
+                        アップグレード
+                      </Link>
+                    )
+                  })()}
+                  <button onClick={signOut} className="w-full text-left px-3 py-2 text-sm text-[#50554f] rounded-md">
+                    ログアウト
+                  </button>
+                </>
               ) : (
                 <>
                   <Link href="/login" className="block px-3 py-2 text-sm text-[#50554f] rounded-md">

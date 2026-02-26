@@ -3,6 +3,8 @@ import type { NewsletterIssue } from '@/types'
 import { Header } from '@/components/public/header'
 import { formatDate } from '@/lib/utils'
 import { SubscribeForm } from '@/components/public/subscribe-form'
+import { getAuthUser, getUserPlan, canAccessFullNewsletter } from '@/lib/auth'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +27,9 @@ export const metadata = {
 }
 
 export default async function NewsletterPage() {
-  const issues = await getIssues()
+  const [issues, user] = await Promise.all([getIssues(), getAuthUser()])
+  const plan = user ? await getUserPlan(user.id) : 'free'
+  const canReadFull = canAccessFullNewsletter(plan)
 
   return (
     <div className="min-h-screen bg-[#f7f7f5]">
@@ -84,7 +88,15 @@ export default async function NewsletterPage() {
 
         {/* Back issues */}
         <div>
-          <h2 className="font-bold text-[#111111] text-lg mb-4">バックナンバー</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-[#111111] text-lg">バックナンバー</h2>
+            {!canReadFull && (
+              <Link href="/pricing" className="text-xs text-[#1d4ed8] hover:underline">
+                Readerプランで全文を読む →
+              </Link>
+            )}
+          </div>
+
           {issues.length === 0 ? (
             <div className="glass rounded-xl p-10 text-center">
               <p className="text-[#767b74]">バックナンバーは準備中です</p>
@@ -93,9 +105,10 @@ export default async function NewsletterPage() {
           ) : (
             <div className="space-y-2.5">
               {issues.map((issue) => (
-                <div
+                <Link
                   key={issue.id}
-                  className="glass glass-hover rounded-xl p-4 cursor-default"
+                  href={`/newsletter/${issue.issue_number}`}
+                  className="glass glass-hover rounded-xl p-4 block"
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
@@ -104,14 +117,24 @@ export default async function NewsletterPage() {
                           #{issue.issue_number}
                         </span>
                         <span className="text-xs text-[#767b74]">{formatDate(issue.sent_at!)}</span>
+                        {!canReadFull && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f1f1ee] text-[#8a8f88]">
+                            冒頭のみ
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-medium text-[#111111] text-sm truncate">{issue.title}</h3>
                     </div>
-                    <span className="text-xs text-[#8a8f88] shrink-0 ml-4">
-                      {issue.recipient_count}人に配信
-                    </span>
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <span className="text-xs text-[#8a8f88] hidden sm:block">
+                        {issue.recipient_count}人に配信
+                      </span>
+                      <svg className="w-4 h-4 text-[#8a8f88]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
