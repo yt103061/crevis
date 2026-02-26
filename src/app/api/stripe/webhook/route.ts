@@ -29,32 +29,64 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  console.log('Webhook received:', event.type)
+
+  // RLS をバイパスするため service_role_key を使う
+  const supabase = createServiceClient({ requireServiceRole: true })
 
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const userId = session.metadata?.supabase_user_id
-        const subscriptionId = session.subscription as string
-
-        if (!userId) break
-
-        // subscription を expand して price ID からプランを判定
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-          expand: ['items.data.price'],
+        console.log('Session data:', {
+          customer: session.customer,
+          subscription: session.subscription,
+          client_reference_id: session.client_reference_id,
+          customer_email: session.customer_email,
+          metadata: session.metadata,
         })
-        const priceId = subscription.items.data[0]?.price?.id
-        const plan = priceId ? planFromPriceId(priceId) : (session.metadata?.plan ?? 'pro')
 
-        await supabase
+        const email = session.customer_details?.email ?? session.customer_email
+        if (!email) {
+          console.error('[Stripe webhook] No email found in checkout session')
+          break
+        }
+
+        const subscriptionId = typeof session.subscription === 'string'
+          ? session.subscription
+          : null
+
+        let planType = 'pro'
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          const priceId = subscription.items.data[0]?.price?.id
+          console.log('Price ID from subscription:', priceId)
+          if (priceId) {
+            planType = planFromPriceId(priceId)
+          }
+        }
+
+        console.log('Updating profile:', {
+          email,
+          planType,
+          customer: session.customer,
+          subscriptionId,
+        })
+
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({
-            plan,
-            stripe_customer_id: session.customer as string,
+            plan: planType,
+            stripe_customer_id: typeof session.customer === 'string' ? session.customer : null,
             stripe_subscription_id: subscriptionId,
           })
-          .eq('id', userId)
+          .eq('email', email)
+
+        if (updateError) {
+          console.error('[Stripe webhook] Profile update failed:', updateError)
+        } else {
+          console.log('[Stripe webhook] Profile updated successfully to:', planType)
+        }
         break
       }
 
@@ -66,13 +98,19 @@ export async function POST(request: NextRequest) {
         const isActive = ['active', 'trialing'].includes(subscription.status)
         const plan = isActive && priceId ? planFromPriceId(priceId) : 'free'
 
-        await supabase
+        console.log('customer.subscription.updated:', { customerId, priceId, plan, status: subscription.status })
+
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({
             plan,
             stripe_subscription_id: subscription.id,
           })
           .eq('stripe_customer_id', customerId)
+
+        if (updateError) {
+          console.error('[Stripe webhook] subscription.updated profile update failed:', updateError)
+        }
         break
       }
 
@@ -80,10 +118,16 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
 
-        await supabase
+        console.log('customer.subscription.deleted:', { customerId })
+
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({ plan: 'free', stripe_subscription_id: null })
           .eq('stripe_customer_id', customerId)
+
+        if (updateError) {
+          console.error('[Stripe webhook] subscription.deleted profile update failed:', updateError)
+        }
         break
       }
 
