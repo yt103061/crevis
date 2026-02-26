@@ -174,9 +174,12 @@ export default function AdminLPsPage() {
                 <div key={lp.id} className="bg-white border border-[#d9dbd6] rounded-xl p-4">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-[#111111] text-sm truncate">
+                      <Link
+                        href={`/admin/lps/${lp.id}`}
+                        className="font-medium text-[#111111] text-sm truncate hover:text-[#1d4ed8] hover:underline block"
+                      >
                         {lp.title ?? '(タイトルなし)'}
-                      </p>
+                      </Link>
                       <a
                         href={lp.url}
                         target="_blank"
@@ -278,9 +281,12 @@ export default function AdminLPsPage() {
                               'bg-rose-500'
                             }`} />
                             <div className="min-w-0">
-                              <div className="font-medium text-[#111111] text-sm truncate">
+                              <Link
+                                href={`/admin/lps/${lp.id}`}
+                                className="font-medium text-[#111111] text-sm truncate hover:text-[#1d4ed8] hover:underline block"
+                              >
                                 {lp.title ?? '(タイトルなし)'}
-                              </div>
+                              </Link>
                               <a
                                 href={lp.url}
                                 target="_blank"

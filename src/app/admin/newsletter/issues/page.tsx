@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { NewsletterIssue } from '@/types'
 import { formatDate } from '@/lib/utils'
 
@@ -281,7 +282,9 @@ export default function NLIssuesPage() {
                         {statusLabel[issue.status] ?? issue.status}
                       </span>
                     </div>
-                    <p className="font-medium text-[#111111] text-sm">{issue.title}</p>
+                    <Link href={`/admin/newsletter/issues/${issue.id}`} className="font-medium text-[#111111] text-sm hover:text-[#1d4ed8] hover:underline block">
+                      {issue.title}
+                    </Link>
                     <p className="text-xs text-[#767b74] mt-0.5">
                       {issue.sent_at ? `配信日: ${formatDate(issue.sent_at)}` : `作成日: ${formatDate(issue.created_at)}`}
                       {issue.recipient_count != null && ` · ${issue.recipient_count}人に配信`}
@@ -340,7 +343,11 @@ export default function NLIssuesPage() {
                       <td className="px-4 py-3">
                         <span className="text-sm font-bold font-num text-[#1d4ed8]">#{issue.issue_number}</span>
                       </td>
-                      <td className="px-4 py-3 font-medium text-sm text-[#111111]">{issue.title}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`/admin/newsletter/issues/${issue.id}`} className="font-medium text-sm text-[#111111] hover:text-[#1d4ed8] hover:underline">
+                          {issue.title}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle[issue.status] ?? 'bg-[#f1f1ee] text-[#5e625c]'}`}>
                           {statusLabel[issue.status] ?? issue.status}
