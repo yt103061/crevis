@@ -14,6 +14,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.cloudflare.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'pub-f07664e38b8e49429301e599d0c482d0.r2.dev',
+        pathname: '/screenshots/**',
+      },
     ],
   },
   async headers() {

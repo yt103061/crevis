@@ -152,7 +152,7 @@ export default async function LPDetailPage({ params }: Props) {
             {/* Screenshot */}
             <div className="glass rounded-2xl overflow-hidden animate-fade-in-up">
               {lp.screenshot_url ? (
-                <div className="relative">
+                <div className="relative max-w-[800px] mx-auto w-full">
                   <Image
                     src={lp.screenshot_url}
                     alt={lp.title ?? lp.url}
@@ -160,6 +160,8 @@ export default async function LPDetailPage({ params }: Props) {
                     height={900}
                     className="w-full h-auto"
                     priority
+                    placeholder="blur"
+                    blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
                   />
                 </div>
               ) : (
@@ -304,6 +306,58 @@ export default async function LPDetailPage({ params }: Props) {
               </div>
             </div>
 
+            {/* Effectiveness Score */}
+            {lp.effectiveness_score !== null && lp.effectiveness_score !== undefined && (
+              <div className="glass rounded-2xl p-5 space-y-4 animate-fade-in-up stagger-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold text-[#111111]">効果推定スコア</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-black text-[#111111]">{lp.effectiveness_score}</span>
+                    <span className="text-sm text-[#767b74]">/ 100</span>
+                    {lp.effectiveness_grade && (
+                      <span className={`ml-1 px-2 py-0.5 rounded text-sm font-bold ${
+                        lp.effectiveness_grade === 'S' ? 'bg-amber-400 text-white' :
+                        lp.effectiveness_grade === 'A' ? 'bg-[#1d4ed8] text-white' :
+                        lp.effectiveness_grade === 'B' ? 'bg-[#767b74] text-white' :
+                        'bg-[#e3e5e0] text-[#5e625c]'
+                      }`}>
+                        {lp.effectiveness_grade}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 内訳 */}
+                <div className="space-y-2">
+                  {lp.longevity_score !== null && lp.longevity_score !== undefined && (
+                    <ScoreBarItem
+                      label="運用実績"
+                      score={lp.longevity_score}
+                      note="Wayback Machine による生存期間"
+                    />
+                  )}
+                  {lp.cro_score !== null && lp.cro_score !== undefined && (
+                    <ScoreBarItem
+                      label="CRO適合度"
+                      score={lp.cro_score}
+                      note="CROベストプラクティスへの適合"
+                    />
+                  )}
+                  {analysis && (
+                    <ScoreBarItem
+                      label="AI総合評価"
+                      score={Math.round((analysis.structure_score + analysis.copy_score + analysis.trust_score + analysis.longevity_score) / 4)}
+                      note="構造・コピー・信頼・稼働の平均"
+                    />
+                  )}
+                </div>
+
+                <p className="text-xs text-[#8a8f88] leading-relaxed pt-1 border-t border-[#d9dbd6]">
+                  このスコアはLPの運用期間、CROベストプラクティスへの適合度、AI分析を組み合わせて算出した、成果の蓋然性を示す独自指標です。
+                </p>
+              </div>
+            )}
+
             {/* Collection */}
             <div className="animate-fade-in-up stagger-3">
               <CollectionButton lpId={lp.id} isCollected={isCollected} isLoggedIn={isLoggedIn} />
@@ -320,6 +374,29 @@ export default async function LPDetailPage({ params }: Props) {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ScoreBarItem({ label, score, note }: { label: string; score: number; note?: string }) {
+  const color = scoreColor(score)
+  const pct = Math.max(0, Math.min(100, score))
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <span className="text-xs font-medium text-[#323632]">{label}</span>
+          {note && <span className="text-[10px] text-[#8a8f88] ml-1.5">{note}</span>}
+        </div>
+        <span className="text-sm font-bold" style={{ color: color.text }}>{score}</span>
+      </div>
+      <div className="w-full h-1.5 rounded-full bg-[#e3e5e0]">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${pct}%`, background: color.ring }}
+        />
       </div>
     </div>
   )

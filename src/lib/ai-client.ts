@@ -157,11 +157,18 @@ ${contentSection}${structureSection}
 - longevity_score: 情報の鮮度・競合優位性・継続運用価値（0-100）
 - total_score: 各スコアの加重平均による総合評価（0-100）
 
+追加で以下も判定してください:
+- industry: "SaaS" | "EC" | "金融" | "不動産" | "教育" | "医療" | "人材" | "飲食" | "美容" | "旅行" | "BtoB" | "その他"
+- lp_purpose: "lead_gen" | "sales" | "signup" | "download" | "event" | "branding" | "other"
+- design_taste: "minimal" | "corporate" | "pop" | "luxury" | "tech" | "natural"
+
 返却JSON形式:
 {
   "inferred_industry": "推論した業界（例: SaaS/EC/人材/不動産/教育/医療/BtoB等）",
   "inferred_purpose": "推論した目的（例: 資料請求/無料トライアル/問い合わせ/購入/会員登録等）",
   "inferred_target_audience": "推論したターゲット（例: 中小企業経営者/Webマーケター/個人ユーザー等）",
+  "inferred_lp_purpose": "lead_gen/sales/signup/download/event/branding/other のいずれか",
+  "inferred_design_taste": "minimal/corporate/pop/luxury/tech/natural のいずれか",
   "structure_score": 0-100,
   "copy_score": 0-100,
   "trust_score": 0-100,
@@ -220,6 +227,11 @@ ${input.original_content.slice(0, 8000)}
 }
 
 JSONのみを返してください。説明文は不要です。`
+}
+
+// 汎用AI呼び出し（プロバイダー切り替え対応）
+export async function callAI(prompt: string): Promise<string> {
+  return AI_PROVIDER === 'claude' ? callClaude(prompt) : callGemini(prompt)
 }
 
 // Gemini 2.5 Flash（無料枠）
