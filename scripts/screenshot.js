@@ -7,6 +7,14 @@
  * スクリーンショット取得に加え、DOM解析データ（ページ高さ・ロード時間等）も保存する
  */
 
+// .env.local を自動ロード（ローカル実行時。CI/GitHub Actions では env: で渡す）
+const path = require('path')
+const fs = require('fs')
+const envPath = path.resolve(__dirname, '..', '.env.local')
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath })
+}
+
 const puppeteer = require('puppeteer')
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const { createClient } = require('@supabase/supabase-js')
@@ -19,6 +27,23 @@ if (!isBatch && (!lpId || !url)) {
   console.error('Usage:')
   console.error('  Single: node scripts/screenshot.js <lp_id> <url>')
   console.error('  Batch:  node scripts/screenshot.js --batch')
+  process.exit(1)
+}
+
+// 必須環境変数チェック
+const REQUIRED_VARS = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'CLOUDFLARE_R2_ACCOUNT_ID',
+  'CLOUDFLARE_R2_ACCESS_KEY_ID',
+  'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
+  'CLOUDFLARE_R2_BUCKET_NAME',
+]
+const missing = REQUIRED_VARS.filter((v) => !process.env[v])
+if (missing.length > 0) {
+  console.error('Missing required environment variables:')
+  missing.forEach((v) => console.error(`  - ${v}`))
+  console.error('\nCreate .env.local with these values, or set them in your environment.')
   process.exit(1)
 }
 
