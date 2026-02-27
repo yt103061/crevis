@@ -54,26 +54,41 @@ export async function PATCH(
       return NextResponse.json({ error: 'LP not found' }, { status: 404 })
     }
 
-    const firstSeen = new Date(lp.first_seen_at)
-    const daysActive = Math.floor(
-      (Date.now() - firstSeen.getTime()) / (1000 * 60 * 60 * 24)
+    const createdAt = lp.first_seen_at ?? lp.created_at ?? new Date().toISOString()
+    const daysActive = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
     )
 
-    const result = await analyzeLP({
-      url: lp.url,
-      industry: lp.industry ?? '不明',
-      purpose: lp.purpose ?? '不明',
-      target_audience: lp.target_audience ?? '不明',
-      days_active: daysActive,
-    })
+    let result
+    try {
+      result = await analyzeLP({
+        url: lp.url,
+        industry: lp.industry ?? '不明',
+        purpose: lp.purpose ?? '不明',
+        target_audience: lp.target_audience ?? '不明',
+        days_active: daysActive,
+      })
+    } catch (aiErr) {
+      console.error('[reanalyze] AI分析エラー:', aiErr)
+      return NextResponse.json(
+        { error: 'AI分析に失敗しました', detail: aiErr instanceof Error ? aiErr.message : String(aiErr) },
+        { status: 500 }
+      )
+    }
 
     // 既存分析を削除して新規保存
     await supabase.from('lp_analyses').delete().eq('lp_id', params.id)
-    const { data: analysis } = await supabase
+    const { data: analysis, error: insertErr } = await supabase
       .from('lp_analyses')
       .insert({ lp_id: params.id, ...result })
       .select()
       .single()
+
+    if (insertErr) {
+      console.error('[reanalyze] DB保存エラー:', insertErr)
+      return NextResponse.json({ error: 'DB保存に失敗しました', detail: insertErr.message }, { status: 500 })
+    }
 
     return NextResponse.json({ analysis })
   }

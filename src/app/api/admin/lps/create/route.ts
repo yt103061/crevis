@@ -64,10 +64,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3: LP登録
+    const inferredTitle = pageFeatures?.metaTitle || null
     const { data: lp, error: lpError } = await supabase
       .from('lps')
       .insert({
         url,
+        title: inferredTitle,
         industry,
         purpose,
         target_audience,

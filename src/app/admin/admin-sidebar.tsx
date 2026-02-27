@@ -15,6 +15,7 @@ const NAV_SECTIONS = [
       { href: '/admin/lps/new', label: 'LP登録' },
       { href: '/admin/lp-candidates', label: 'LP候補' },
       { href: '/admin/lp-sources', label: '収集ソース' },
+      { href: '/admin/takedowns', label: '削除申請' },
     ],
   },
   {

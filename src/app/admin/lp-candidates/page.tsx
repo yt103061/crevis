@@ -68,10 +68,25 @@ export default function LPCandidatesPage() {
       const res = await fetch('/api/admin/lp-candidates/collect', { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
-        alert(
-          `収集完了\n新規候補: ${data.newCandidates}件\n自動承認: ${data.autoAccepted}件` +
-          (data.sourceErrors?.length ? `\nエラー: ${data.sourceErrors.join(', ')}` : '')
-        )
+        const d = data.debug ?? {}
+        const lines = [
+          `収集完了`,
+          ``,
+          `ソース数: ${d.sourcesTotal ?? '?'}件`,
+          `収集URL数: ${d.urlsCollectedRaw ?? '?'}件`,
+          `新規登録: ${data.newCandidates}件`,
+          `自動承認: ${data.autoAccepted}件`,
+        ]
+        if (d.insertFailed) lines.push(`INSERT失敗: ${d.insertFailed}件`)
+        if (d.sourceDetail) {
+          lines.push(``)
+          lines.push(`ソース別:`)
+          for (const [name, s] of Object.entries(d.sourceDetail as Record<string, { collected: number; inserted: number; autoAccepted: number; insertErrors: number }>)) {
+            lines.push(`  ${name}: 収集${s.collected}→登録${s.inserted} (自動承認${s.autoAccepted})`)
+          }
+        }
+        if (data.sourceErrors?.length) lines.push(``, `エラー: ${data.sourceErrors.join(', ')}`)
+        alert(lines.join('\n'))
         loadCandidates()
       } else {
         alert(data.error ?? '収集に失敗しました')

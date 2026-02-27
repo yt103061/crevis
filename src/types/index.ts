@@ -1,4 +1,4 @@
-export type LPStatus = 'active' | 'archived' | 'takedown'
+export type LPStatus = 'active' | 'archived' | 'takedown' | 'inactive'
 
 export type PlanType = 'free' | 'reader' | 'pro' | 'team'
 
@@ -8,15 +8,40 @@ export interface LP {
   title: string | null
   industry: string | null
   purpose: string | null
+  lp_purpose: string | null
+  design_taste: string | null
   target_audience: string | null
   screenshot_url: string | null
+  mobile_screenshot_url: string | null
   first_seen_at: string
   last_checked_at: string | null
   ad_platform: string | null
   status: LPStatus
+  source: string | null
+  url_hash: string | null
   created_at: string
   lp_confidence_score: number | null
   is_likely_lp: boolean | null
+  longevity_score: number | null
+  cro_score: number | null
+  effectiveness_score: number | null
+  effectiveness_grade: string | null
+  longevity_checked_at: string | null
+  cro_checked_at: string | null
+  // LP収集アルゴリズム v2 追加フィールド
+  ad_first_seen_at: string | null
+  ad_last_seen_at: string | null
+  ad_days_active: number | null
+  advertiser_id: string | null
+  ad_keywords: string[] | null
+  has_noindex: boolean | null
+  discovery_source: string | null
+}
+
+export interface CandidateURL {
+  url: string
+  source: string
+  title?: string
 }
 
 export interface LPPageFeatures {
@@ -163,6 +188,10 @@ export interface LPAnalysisOutput {
   inferred_purpose?: string
   /** LLMがページ内容から推論したターゲットオーディエンス */
   inferred_target_audience?: string
+  /** LLMが判定したLP種別 */
+  inferred_lp_purpose?: string
+  /** LLMが判定したデザインテイスト */
+  inferred_design_taste?: string
 }
 
 export interface ArticleInput {

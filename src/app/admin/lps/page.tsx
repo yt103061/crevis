@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { LPWithAnalysis } from '@/types'
@@ -10,31 +10,73 @@ export default function AdminLPsPage() {
   const [lps, setLps] = useState<LPWithAnalysis[]>([])
   const [loading, setLoading] = useState(true)
   const [discovering, setDiscovering] = useState(false)
-  const [filter, setFilter] = useState({ status: '', industry: '', sortBy: 'created_at' })
+  const [discoveringV2, setDiscoveringV2] = useState(false)
 
+  // フィルター状態
+  const [statusFilter, setStatusFilter] = useState('')
+  const [screenshotFilter, setScreenshotFilter] = useState('')
+  const [sortBy, setSortBy] = useState('created_at')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // チェックボックス選択状態
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // 検索デバウンス
   useEffect(() => {
-    fetchLPs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter])
+    const t = setTimeout(() => setDebouncedSearch(searchInput), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-  async function fetchLPs() {
+  const fetchLPs = useCallback(async () => {
     setLoading(true)
+    setSelectedIds(new Set())
+
     let query = supabase
       .from('lps')
       .select('*, lp_analyses(*)')
       .order(
-        filter.sortBy === 'score'
-          ? 'lp_analyses(total_score)'
-          : 'created_at',
+        sortBy === 'score' ? 'lp_analyses(total_score)' : 'created_at',
         { ascending: false }
       )
 
-    if (filter.status) query = query.eq('status', filter.status)
-    if (filter.industry) query = query.eq('industry', filter.industry)
+    if (statusFilter) query = query.eq('status', statusFilter)
+    if (screenshotFilter === 'has') query = query.not('screenshot_url', 'is', null)
+    if (screenshotFilter === 'none') query = query.is('screenshot_url', null)
+    if (debouncedSearch) {
+      const esc = debouncedSearch.replace(/%/g, '\\%').replace(/_/g, '\\_')
+      query = query.or(`title.ilike.%${esc}%,url.ilike.%${esc}%`)
+    }
 
-    const { data } = await query.limit(100)
+    const { data } = await query.limit(200)
     setLps((data as LPWithAnalysis[]) ?? [])
     setLoading(false)
+  }, [statusFilter, screenshotFilter, sortBy, debouncedSearch])
+
+  useEffect(() => {
+    fetchLPs()
+  }, [fetchLPs])
+
+  // 一括操作
+  async function bulkAction(action: 'delete' | 'deactivate' | 'reset_screenshot') {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    if (action === 'delete') {
+      if (!confirm(`${ids.length}件のLPを完全に削除しますか？この操作は取り消せません`)) return
+    }
+
+    const res = await fetch('/api/admin/lps/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ids }),
+    })
+    if (res.ok) {
+      fetchLPs()
+    } else {
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? '操作に失敗しました')
+    }
   }
 
   async function updateStatus(id: string, status: string) {
@@ -63,17 +105,30 @@ export default function AdminLPsPage() {
     const res = await fetch('/api/admin/lps/discover', { method: 'POST' })
     const data = await res.json()
     setDiscovering(false)
-
     if (!res.ok) {
       alert(data.error ?? '自動発見に失敗しました')
       return
     }
-
     const results = data.results
     const feedErr = (results.feed_error_details ?? []).slice(0, 3).join(' / ')
     alert(
       `自動発見完了\n候補: ${results.discovered}件\n登録: ${results.inserted}件\n分析: ${results.analyzed}件\n公開: ${results.activated}件\nスキップ: ${results.skipped}件\nヒューリスティック除外: ${results.heuristic_skipped ?? 0}件\nエラー: ${results.errors}件\nフィードエラー: ${results.feed_errors ?? 0}件${feedErr ? `\n詳細: ${feedErr}` : ''}`
     )
+    fetchLPs()
+  }
+
+  async function discoverLPsV2() {
+    setDiscoveringV2(true)
+    const res = await fetch('/api/cron/lp-discover-v2', { method: 'GET' })
+    const data = await res.json()
+    setDiscoveringV2(false)
+    if (!res.ok) {
+      alert(data.error ?? 'v2自動発見に失敗しました')
+      return
+    }
+    const results: Array<{ layer: string; discovered: number; inserted: number; activated: number; errors: number }> = data.results ?? []
+    const summary = results.map((r) => `${r.layer}: 発見${r.discovered}件 登録${r.inserted}件 公開${r.activated}件`).join('\n')
+    alert(`AI収集 v2 完了\n${summary || '結果なし'}`)
     fetchLPs()
   }
 
@@ -90,6 +145,27 @@ export default function AdminLPsPage() {
       alert('再分析に失敗しました')
     }
   }
+
+  // チェックボックス操作
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selectedIds.size === lps.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(lps.map((lp) => lp.id)))
+    }
+  }
+
+  const allSelected = lps.length > 0 && selectedIds.size === lps.length
+  const someSelected = selectedIds.size > 0
 
   return (
     <div>
@@ -109,6 +185,13 @@ export default function AdminLPsPage() {
           >
             {discovering ? '収集中...' : 'Webから自動発見'}
           </button>
+          <button
+            onClick={discoverLPsV2}
+            disabled={discoveringV2}
+            className="px-3 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+          >
+            {discoveringV2 ? '収集中...' : 'AI収集 v2'}
+          </button>
           <Link
             href="/admin/lps/new"
             className="px-3 py-2 bg-[#111111] text-white text-sm font-medium rounded-lg hover:bg-[#2a2a2a] transition-colors"
@@ -118,26 +201,43 @@ export default function AdminLPsPage() {
         </div>
       </div>
 
-      {/* フィルター */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      {/* フィルター（常時表示） */}
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select
-          value={filter.status}
-          onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value }))}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
           className="text-sm border border-[#d9dbd6] rounded-lg px-3 py-2 bg-white text-[#111111] focus:outline-none focus:border-[#111111]"
         >
-          <option value="">全て</option>
+          <option value="">全ステータス</option>
           <option value="active">公開中</option>
+          <option value="inactive">非公開</option>
           <option value="archived">アーカイブ</option>
           <option value="takedown">削除申請</option>
         </select>
         <select
-          value={filter.sortBy}
-          onChange={(e) => setFilter((f) => ({ ...f, sortBy: e.target.value }))}
+          value={screenshotFilter}
+          onChange={(e) => setScreenshotFilter(e.target.value)}
+          className="text-sm border border-[#d9dbd6] rounded-lg px-3 py-2 bg-white text-[#111111] focus:outline-none focus:border-[#111111]"
+        >
+          <option value="">スクショ: 全て</option>
+          <option value="has">スクショあり</option>
+          <option value="none">スクショなし</option>
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
           className="text-sm border border-[#d9dbd6] rounded-lg px-3 py-2 bg-white text-[#111111] focus:outline-none focus:border-[#111111]"
         >
           <option value="created_at">登録日順</option>
           <option value="score">スコア順</option>
         </select>
+        <input
+          type="text"
+          placeholder="タイトル・URLで検索..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="text-sm border border-[#d9dbd6] rounded-lg px-3 py-2 bg-white text-[#111111] focus:outline-none focus:border-[#111111] min-w-[180px]"
+        />
         <button
           onClick={fetchLPs}
           className="px-3 py-2 text-sm border border-[#d9dbd6] rounded-lg bg-white text-[#5e625c] hover:bg-[#f1f1ee] transition-colors"
@@ -145,6 +245,38 @@ export default function AdminLPsPage() {
           更新
         </button>
       </div>
+
+      {/* 一括操作バー（選択時のみ表示） */}
+      {someSelected && (
+        <div className="sticky top-0 z-20 flex items-center gap-3 mb-4 px-4 py-3 bg-[#111111] text-white rounded-xl shadow-lg flex-wrap">
+          <span className="text-sm font-medium">{selectedIds.size}件選択中</span>
+          <div className="flex-1" />
+          <button
+            onClick={() => bulkAction('reset_screenshot')}
+            className="px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          >
+            スクショ再取得
+          </button>
+          <button
+            onClick={() => bulkAction('deactivate')}
+            className="px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          >
+            一括非公開
+          </button>
+          <button
+            onClick={() => bulkAction('delete')}
+            className="px-3 py-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors"
+          >
+            一括削除
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="px-3 py-1.5 text-xs text-white/60 hover:text-white transition-colors"
+          >
+            解除
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="py-16 text-center text-[#8a8f88] text-sm">読み込み中...</div>
@@ -170,85 +302,82 @@ export default function AdminLPsPage() {
           <div className="sm:hidden space-y-3">
             {lps.map((lp) => {
               const analysis = lp.lp_analyses?.[0]
+              const isSelected = selectedIds.has(lp.id)
               return (
-                <div key={lp.id} className="bg-white border border-[#d9dbd6] rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                <div
+                  key={lp.id}
+                  className={`bg-white border rounded-xl p-4 transition-colors ${
+                    isSelected ? 'border-[#1d4ed8] ring-1 ring-[#1d4ed8]' : 'border-[#d9dbd6]'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(lp.id)}
+                      className="mt-0.5 w-4 h-4 rounded border-[#d9dbd6] text-[#1d4ed8] focus:ring-[#1d4ed8] shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/admin/lps/${lp.id}`}
-                        className="font-medium text-[#111111] text-sm truncate hover:text-[#1d4ed8] hover:underline block"
-                      >
-                        {lp.title ?? '(タイトルなし)'}
-                      </Link>
-                      <a
-                        href={lp.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-[#1d4ed8] hover:underline truncate block max-w-full mt-0.5"
-                      >
-                        {lp.url}
-                      </a>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            href={`/admin/lps/${lp.id}`}
+                            className="font-medium text-[#111111] text-sm truncate hover:text-[#1d4ed8] hover:underline block"
+                          >
+                            {lp.title ?? '(タイトルなし)'}
+                          </Link>
+                          <a
+                            href={lp.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-[#1d4ed8] hover:underline truncate block max-w-full mt-0.5"
+                          >
+                            {lp.url}
+                          </a>
+                        </div>
+                        {analysis ? (
+                          <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-num ${scoreBg(analysis.total_score)}`}>
+                            {analysis.total_score}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-xs text-[#8a8f88]">未分析</span>
+                        )}
+                      </div>
                     </div>
-                    {analysis ? (
-                      <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium font-num ${scoreBg(analysis.total_score)}`}>
-                        {analysis.total_score}
-                      </span>
-                    ) : (
-                      <span className="shrink-0 text-xs text-[#8a8f88]">未分析</span>
-                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-[#767b74] mb-3 flex-wrap">
+                  <div className="flex items-center gap-2 text-xs text-[#767b74] mb-3 flex-wrap pl-7">
                     {lp.industry && (
                       <span className="bg-[#f1f1ee] px-2 py-0.5 rounded text-[#5e625c]">{lp.industry}</span>
                     )}
                     <span>{formatDate(lp.created_at)}</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                       lp.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
+                      lp.status === 'inactive' ? 'bg-amber-50 text-amber-700' :
                       lp.status === 'archived' ? 'bg-[#f1f1ee] text-[#5e625c]' :
                       'bg-rose-50 text-rose-700'
                     }`}>
-                      {lp.status === 'active' ? '公開中' : lp.status === 'archived' ? 'アーカイブ' : '削除申請'}
+                      {lp.status === 'active' ? '公開中' : lp.status === 'inactive' ? '非公開' : lp.status === 'archived' ? 'アーカイブ' : '削除申請'}
                     </span>
+                    {lp.screenshot_url ? (
+                      <span className="text-[10px] text-emerald-600">📷</span>
+                    ) : (
+                      <span className="text-[10px] text-[#b0b5ae]">スクショなし</span>
+                    )}
                   </div>
 
-                  <div className="flex gap-3 flex-wrap border-t border-[#e3e5e0] pt-3">
-                    <button
-                      onClick={() => reanalyze(lp.id)}
-                      className="text-xs font-medium text-[#1d4ed8] hover:underline"
-                    >
-                      再分析
-                    </button>
+                  <div className="flex gap-3 flex-wrap border-t border-[#e3e5e0] pt-3 pl-7">
+                    <button onClick={() => reanalyze(lp.id)} className="text-xs font-medium text-[#1d4ed8] hover:underline">再分析</button>
                     {lp.status === 'active' && (
-                      <button
-                        onClick={() => updateStatus(lp.id, 'archived')}
-                        className="text-xs text-[#5e625c] hover:underline"
-                      >
-                        アーカイブ
-                      </button>
+                      <button onClick={() => updateStatus(lp.id, 'inactive')} className="text-xs text-amber-600 hover:underline">非公開</button>
                     )}
-                    {lp.status === 'archived' && (
-                      <button
-                        onClick={() => updateStatus(lp.id, 'active')}
-                        className="text-xs text-emerald-600 hover:underline"
-                      >
-                        公開に戻す
-                      </button>
+                    {(lp.status === 'inactive' || lp.status === 'archived') && (
+                      <button onClick={() => updateStatus(lp.id, 'active')} className="text-xs text-emerald-600 hover:underline">公開に戻す</button>
                     )}
                     {lp.status === 'takedown' && (
-                      <button
-                        onClick={() => updateStatus(lp.id, 'archived')}
-                        className="text-xs text-amber-600 hover:underline"
-                      >
-                        削除処理済み
-                      </button>
+                      <button onClick={() => updateStatus(lp.id, 'archived')} className="text-xs text-amber-600 hover:underline">削除処理済み</button>
                     )}
-                    <button
-                      onClick={() => deleteLp(lp.id, lp.title ?? '')}
-                      className="text-xs text-rose-600 hover:underline ml-auto"
-                    >
-                      完全削除
-                    </button>
+                    <button onClick={() => deleteLp(lp.id, lp.title ?? '')} className="text-xs text-rose-600 hover:underline ml-auto">完全削除</button>
                   </div>
                 </div>
               )
@@ -261,9 +390,18 @@ export default function AdminLPsPage() {
               <table className="min-w-full divide-y divide-[#e3e5e0]">
                 <thead className="bg-[#f7f7f5]">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        className="w-4 h-4 rounded border-[#d9dbd6] text-[#1d4ed8] focus:ring-[#1d4ed8]"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[#5e625c] uppercase tracking-wide">タイトル / URL</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[#5e625c] uppercase tracking-wide whitespace-nowrap">業界</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[#5e625c] uppercase tracking-wide">スコア</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5e625c] uppercase tracking-wide whitespace-nowrap">スクショ</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[#5e625c] uppercase tracking-wide whitespace-nowrap">登録日</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[#5e625c] uppercase tracking-wide">操作</th>
                   </tr>
@@ -271,12 +409,25 @@ export default function AdminLPsPage() {
                 <tbody className="divide-y divide-[#e3e5e0]">
                   {lps.map((lp) => {
                     const analysis = lp.lp_analyses?.[0]
+                    const isSelected = selectedIds.has(lp.id)
                     return (
-                      <tr key={lp.id} className="hover:bg-[#fafafa] transition-colors">
+                      <tr
+                        key={lp.id}
+                        className={`transition-colors ${isSelected ? 'bg-[#eef2ff]' : 'hover:bg-[#fafafa]'}`}
+                      >
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(lp.id)}
+                            className="w-4 h-4 rounded border-[#d9dbd6] text-[#1d4ed8] focus:ring-[#1d4ed8]"
+                          />
+                        </td>
                         <td className="px-4 py-3 max-w-xs">
                           <div className="flex items-center gap-2">
                             <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${
                               lp.status === 'active' ? 'bg-emerald-500' :
+                              lp.status === 'inactive' ? 'bg-amber-400' :
                               lp.status === 'archived' ? 'bg-[#b0b5ae]' :
                               'bg-rose-500'
                             }`} />
@@ -308,45 +459,27 @@ export default function AdminLPsPage() {
                             <span className="text-xs text-[#8a8f88]">未分析</span>
                           )}
                         </td>
+                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                          {lp.screenshot_url ? (
+                            <span className="text-emerald-600">あり</span>
+                          ) : (
+                            <span className="text-[#b0b5ae]">なし</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm text-[#767b74] whitespace-nowrap">{formatDate(lp.created_at)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3 whitespace-nowrap">
-                            <button
-                              onClick={() => reanalyze(lp.id)}
-                              className="text-xs text-[#1d4ed8] hover:underline font-medium"
-                            >
-                              再分析
-                            </button>
+                            <button onClick={() => reanalyze(lp.id)} className="text-xs text-[#1d4ed8] hover:underline font-medium">再分析</button>
                             {lp.status === 'active' && (
-                              <button
-                                onClick={() => updateStatus(lp.id, 'archived')}
-                                className="text-xs text-[#5e625c] hover:underline"
-                              >
-                                アーカイブ
-                              </button>
+                              <button onClick={() => updateStatus(lp.id, 'inactive')} className="text-xs text-amber-600 hover:underline">非公開</button>
                             )}
-                            {lp.status === 'archived' && (
-                              <button
-                                onClick={() => updateStatus(lp.id, 'active')}
-                                className="text-xs text-emerald-600 hover:underline"
-                              >
-                                公開
-                              </button>
+                            {(lp.status === 'inactive' || lp.status === 'archived') && (
+                              <button onClick={() => updateStatus(lp.id, 'active')} className="text-xs text-emerald-600 hover:underline">公開</button>
                             )}
                             {lp.status === 'takedown' && (
-                              <button
-                                onClick={() => updateStatus(lp.id, 'archived')}
-                                className="text-xs text-amber-600 hover:underline"
-                              >
-                                削除処理済み
-                              </button>
+                              <button onClick={() => updateStatus(lp.id, 'archived')} className="text-xs text-amber-600 hover:underline">削除処理済み</button>
                             )}
-                            <button
-                              onClick={() => deleteLp(lp.id, lp.title ?? '')}
-                              className="text-xs text-rose-600 hover:underline"
-                            >
-                              削除
-                            </button>
+                            <button onClick={() => deleteLp(lp.id, lp.title ?? '')} className="text-xs text-rose-600 hover:underline">削除</button>
                           </div>
                         </td>
                       </tr>
