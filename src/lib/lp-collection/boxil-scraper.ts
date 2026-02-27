@@ -56,7 +56,7 @@ export async function scrapeBoxilDomains(limit = 50): Promise<SaaSProductLP[]> {
       }
 
       // 外部リンク全般からドメインを取得（href内のboxil.jp以外）
-      const externalLinkRegex = /href=["'](https?:\/\/(?!boxil\.jp|google\.|facebook\.|twitter\.)[a-zA-Z0-9\-.]+\.co\.jp[^"']*)["']/g
+      const externalLinkRegex = /href=["'](https?:\/\/(?!boxil\.jp|google\.|facebook\.|twitter\.|linkedin\.|apple\.|microsoft\.)[a-zA-Z0-9\-]+\.(co\.jp|com|io|jp)(?:\/[^"']*)?)["']/g
       while ((match = externalLinkRegex.exec(html)) !== null) {
         const href = match[1]
         try {

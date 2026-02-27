@@ -29,9 +29,9 @@ export async function discoverLPsFromWayback(domain: string): Promise<WaybackLP[
   cdxUrl.searchParams.set('fl', 'original,timestamp,statuscode')
   cdxUrl.searchParams.set('collapse', 'urlkey')
   cdxUrl.searchParams.set('limit', '200')
-  cdxUrl.searchParams.set('filter', 'statuscode:200')
-  // LP系パスのみ取得
-  cdxUrl.searchParams.set('filter', 'original:.*(/lp|/landing|/campaign|/trial|/signup|/form|/cv)')
+  cdxUrl.searchParams.append('filter', 'statuscode:200')
+  // LP系パスのみ取得（ANDフィルター: CDX APIは同名パラメータ複数でAND条件）
+  cdxUrl.searchParams.append('filter', 'original:.*(/lp|/landing|/campaign|/trial|/signup|/form|/cv)')
 
   let rows: string[][] = []
   try {

@@ -53,7 +53,7 @@ export async function discoverFromGoogleSearchAds(keyword: string, region = 'jp'
 
   for (const ad of ads) {
     const a = ad as Record<string, unknown>
-    const link = (a.link ?? a.displayed_link) as string | undefined
+    const link = a.link as string | undefined
     if (!link) continue
 
     let domain = ''

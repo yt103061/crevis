@@ -5,8 +5,7 @@
  * 1. SerpAPI Google Search Ads → 直接LP URL（最高品質、課金あり）
  * 2. robots.txt Disallow probe → 隠しLP発掘（無料）
  * 3. Wayback CDX domain expansion → 過去LP URL（無料）
- * 4. BOXIL JP SaaS比較 → 販売意図LP（無料）
- * 5. 既存RSS発見（lp-discovery.ts）→ 補完
+ * 4. ギャラリーシード → sankoudesign/muuuuu.org 等から外部LP収集（無料）
  *
  * 各候補は既存の scoreLpHtml + AI分析に通す（変更なし）。
  */
@@ -46,6 +45,7 @@ export async function runAdvancedLPDiscovery(options: {
   enableRobotsProbe?: boolean
   enableWayback?: boolean
   enableBoxil?: boolean
+  enableGallerySeed?: boolean
   maxNewPerRun?: number
   minScore?: number
 } = {}): Promise<AdvancedDiscoveryResult[]> {
@@ -53,6 +53,7 @@ export async function runAdvancedLPDiscovery(options: {
     enableSerpAPI = !!process.env.SERPAPI_KEY,
     enableRobotsProbe = true,
     enableWayback = true,
+    enableGallerySeed = true,
     maxNewPerRun = 10,
     minScore = 70,
   } = options
@@ -62,6 +63,7 @@ export async function runAdvancedLPDiscovery(options: {
   let totalInserted = 0
 
   // ヘルパー: URL候補をDBに登録 + AI分析
+  // 返り値: 'activated'（スコア合格・公開）| 'inserted'（登録のみ）| false（スキップ/失敗）
   async function processCandidate(candidate: {
     url: string
     discoverySource: string
@@ -69,7 +71,7 @@ export async function runAdvancedLPDiscovery(options: {
     advertiserId?: string
     adKeywords?: string[]
     hasNoindex?: boolean
-  }): Promise<boolean> {
+  }): Promise<'activated' | 'inserted' | false> {
     if (totalInserted >= maxNewPerRun) return false
 
     // 重複チェック
@@ -148,9 +150,9 @@ export async function runAdvancedLPDiscovery(options: {
         ...(inferred_target_audience ? { target_audience: inferred_target_audience } : {}),
       }).eq('id', lp.id)
 
-      return shouldActivate
+      return shouldActivate ? 'activated' : 'inserted'
     } catch {
-      return false
+      return 'inserted'
     }
   }
 
@@ -170,16 +172,16 @@ export async function runAdvancedLPDiscovery(options: {
 
         for (const c of candidates) {
           if (totalInserted >= maxNewPerRun) break
-          const activated = await processCandidate({
+          const r = await processCandidate({
             url: c.url,
             discoverySource: 'serpapi_search',
             adKeywords: c.keywords,
             adDaysActive: c.daysActive,
             advertiserId: c.advertiserId,
           })
-          if (activated) layerResult.activated++
-          layerResult.inserted++
-          await new Promise(r => setTimeout(r, 500))
+          if (r === 'activated') { layerResult.activated++; layerResult.inserted++ }
+          else if (r === 'inserted') { layerResult.inserted++ }
+          await new Promise(res => setTimeout(res, 500))
         }
       } catch { layerResult.errors++ }
     }
@@ -198,16 +200,17 @@ export async function runAdvancedLPDiscovery(options: {
         const probedLPs = await probeLPsFromRobotsTxt(product.domain)
         layerResult.discovered += probedLPs.length
         for (const lp of probedLPs.slice(0, 3)) {
-          const activated = await processCandidate({
+          if (totalInserted >= maxNewPerRun) break
+          const r = await processCandidate({
             url: lp.url,
             discoverySource: 'robots_txt',
           })
-          if (activated) layerResult.activated++
-          layerResult.inserted++
-          await new Promise(r => setTimeout(r, 500))
+          if (r === 'activated') { layerResult.activated++; layerResult.inserted++ }
+          else if (r === 'inserted') { layerResult.inserted++ }
+          await new Promise(res => setTimeout(res, 500))
         }
       } catch { layerResult.errors++ }
-      await new Promise(r => setTimeout(r, 1000))
+      await new Promise(res => setTimeout(res, 1000))
     }
     results.push(layerResult)
   }
@@ -231,17 +234,42 @@ export async function runAdvancedLPDiscovery(options: {
           const waybackLPs = await discoverLPsFromWayback(domain)
           layerResult.discovered += waybackLPs.length
           for (const wlp of waybackLPs.slice(0, 2)) {
-            const activated = await processCandidate({
+            if (totalInserted >= maxNewPerRun) break
+            const r = await processCandidate({
               url: wlp.url,
               discoverySource: 'wayback_cdx',
               adDaysActive: wlp.daysActive,
             })
-            if (activated) layerResult.activated++
-            layerResult.inserted++
+            if (r === 'activated') { layerResult.activated++; layerResult.inserted++ }
+            else if (r === 'inserted') { layerResult.inserted++ }
           }
         } catch { layerResult.errors++ }
       }
     }
+    results.push(layerResult)
+  }
+
+  // --- Layer 4: Gallery Seed ---
+  if (enableGallerySeed) {
+    const layerResult: AdvancedDiscoveryResult = { layer: 'gallery_seed', discovered: 0, inserted: 0, activated: 0, errors: 0 }
+    try {
+      const { scrapeGallerySeedLPs } = await import('./gallery-seed')
+      const seeds = await scrapeGallerySeedLPs(30)
+      layerResult.discovered = seeds.length
+
+      for (const seed of seeds) {
+        if (totalInserted >= maxNewPerRun) break
+        try {
+          const r = await processCandidate({
+            url: seed.url,
+            discoverySource: `gallery_seed:${seed.sourceGallery}`,
+          })
+          if (r === 'activated') { layerResult.activated++; layerResult.inserted++ }
+          else if (r === 'inserted') { layerResult.inserted++ }
+          await new Promise(res => setTimeout(res, 500))
+        } catch { layerResult.errors++ }
+      }
+    } catch { layerResult.errors++ }
     results.push(layerResult)
   }
 
