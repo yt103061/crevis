@@ -155,8 +155,8 @@ export async function runDiscoveryPipeline(): Promise<PipelineResult> {
 
       result.aiApproved++
 
-      // 候補を pending として保存
-      await supabase.from('lp_candidates').upsert(
+      // 候補を new として保存（UIフィルターと一致させる）
+      const { error: upsertErr } = await supabase.from('lp_candidates').upsert(
         {
           url: normalized,
           url_hash: urlHash,
@@ -165,11 +165,14 @@ export async function runDiscoveryPipeline(): Promise<PipelineResult> {
           heuristic_score: cro.score,
           ai_is_lp: lpJudge.isLP,
           ai_confidence: lpJudge.confidence,
-          status: 'pending',
+          status: 'new',
           processed_at: new Date().toISOString(),
         },
         { onConflict: 'url' }
       )
+      if (upsertErr) {
+        console.error('[Pipeline] lp_candidates upsert失敗:', normalized, upsertErr.message)
+      }
 
       // 6. Longevity チェック（APIレート制限対策: 1秒待機）
       await new Promise((r) => setTimeout(r, 1000))
@@ -223,7 +226,10 @@ export async function runDiscoveryPipeline(): Promise<PipelineResult> {
         .select('id')
         .single()
 
-      if (lpError || !lpData) continue
+      if (lpError || !lpData) {
+        console.error('[Pipeline] lps upsert失敗:', normalized, lpError?.message)
+        continue
+      }
 
       const lpId = (lpData as { id: string }).id
 

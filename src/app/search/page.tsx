@@ -13,7 +13,7 @@ async function searchLPs(query: string): Promise<LPWithAnalysis[]> {
   const { data } = await supabase
     .from('lps')
     .select('*, lp_analyses(*)')
-    .eq('status', 'active')
+    .or('status.eq.active,status.is.null')
     .or(`title.ilike.%${query}%,industry.ilike.%${query}%,purpose.ilike.%${query}%,target_audience.ilike.%${query}%`)
     .limit(20)
 

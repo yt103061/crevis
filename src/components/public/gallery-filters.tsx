@@ -26,7 +26,7 @@ export function GalleryFilters() {
       if (!value) params.delete(key)
       else params.set(key, value)
       const query = params.toString()
-      router.push(query ? `${pathname}?${query}` : pathname)
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
     },
     [router, pathname, searchParams]
   )
@@ -67,7 +67,7 @@ export function GalleryFilters() {
           <span className="text-xs text-[#767b74]">絞り込み中:</span>
           {currentParams.industry && <ActiveTag label={currentParams.industry} onRemove={() => updateParam('industry', '')} />}
           {currentParams.purpose && <ActiveTag label={currentParams.purpose} onRemove={() => updateParam('purpose', '')} />}
-          <button onClick={() => router.push('/')} className="text-xs text-[#767b74] hover:text-[#111] transition-colors ml-1">
+          <button onClick={() => router.replace('/', { scroll: false })} className="text-xs text-[#767b74] hover:text-[#111] transition-colors ml-1">
             クリア
           </button>
         </div>

@@ -32,6 +32,8 @@ export default function NLArticlesPage() {
   const [statusFilter, setStatusFilter] = useState('pending')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showContent, setShowContent] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkActing, setBulkActing] = useState(false)
 
   useEffect(() => {
     loadArticles()
@@ -41,6 +43,7 @@ export default function NLArticlesPage() {
   async function loadArticles() {
     setLoading(true)
     setFetchError('')
+    setSelectedIds(new Set())
     try {
       const params = statusFilter ? `?status=${statusFilter}` : ''
       const res = await fetch(`/api/admin/nl/articles${params}`)
@@ -56,6 +59,46 @@ export default function NLArticlesPage() {
       setArticles([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selectedIds.size === articles.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(articles.map((a) => a.id)))
+    }
+  }
+
+  async function bulkAction(action: 'approve' | 'reject' | 'pending') {
+    if (!selectedIds.size) return
+    const ids = Array.from(selectedIds)
+    setBulkActing(true)
+    try {
+      const res = await fetch('/api/admin/nl/articles/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(`一括操作に失敗しました: ${data.error ?? res.status}`)
+      } else {
+        loadArticles()
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '操作に失敗しました')
+    } finally {
+      setBulkActing(false)
     }
   }
 
@@ -178,6 +221,42 @@ export default function NLArticlesPage() {
         ))}
       </div>
 
+      {/* 一括操作バー */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 sticky top-2 z-20 flex items-center gap-3 p-3 bg-[#111111] text-white rounded-xl shadow-lg flex-wrap">
+          <span className="text-sm font-medium">{selectedIds.size}件選択中</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <button
+              onClick={() => bulkAction('approve')}
+              disabled={bulkActing}
+              className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
+            >
+              {bulkActing ? '処理中...' : '一括承認'}
+            </button>
+            <button
+              onClick={() => bulkAction('reject')}
+              disabled={bulkActing}
+              className="px-3 py-1.5 text-xs bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50 font-medium"
+            >
+              一括却下
+            </button>
+            <button
+              onClick={() => bulkAction('pending')}
+              disabled={bulkActing}
+              className="px-3 py-1.5 text-xs bg-white/20 text-white rounded-lg hover:bg-white/30 disabled:opacity-50"
+            >
+              未処理に戻す
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 text-xs bg-transparent text-white/70 hover:text-white rounded-lg"
+            >
+              解除
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* エラー */}
       {fetchError && (
         <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 flex items-center justify-between gap-2">
@@ -191,6 +270,19 @@ export default function NLArticlesPage() {
         <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
           AIが関連度スコアを30未満と判断した記事、またはキーワードフィルターで除外された記事です。
           必要に応じて「未処理に戻す」から再審査できます。
+        </div>
+      )}
+
+      {/* 全選択ヘッダー */}
+      {!loading && articles.length > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            type="checkbox"
+            checked={selectedIds.size === articles.length}
+            onChange={toggleAll}
+            className="w-4 h-4 rounded border-[#d9dbd6] text-[#1d4ed8] cursor-pointer"
+          />
+          <span className="text-xs text-[#767b74]">全て選択</span>
         </div>
       )}
 
@@ -217,10 +309,18 @@ export default function NLArticlesPage() {
         ) : (
           articles.map((article) => {
             const isExpanded = expanded === article.id
+            const isSelected = selectedIds.has(article.id)
             return (
-              <div key={article.id} className="bg-white rounded-xl border border-[#d9dbd6]">
+              <div key={article.id} className={`bg-white rounded-xl border transition-colors ${isSelected ? 'border-[#1d4ed8] bg-[#f8faff]' : 'border-[#d9dbd6]'}`}>
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(article.id)}
+                        className="w-4 h-4 mt-0.5 rounded border-[#d9dbd6] text-[#1d4ed8] cursor-pointer shrink-0"
+                      />
                     <div className="flex-1 min-w-0">
                       {/* バッジ行 */}
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -341,6 +441,7 @@ export default function NLArticlesPage() {
                           </button>
                         ) : null}
                       </div>
+                    </div>
                     </div>
 
                     {/* ステータスアクション */}

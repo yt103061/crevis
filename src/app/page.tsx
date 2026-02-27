@@ -17,7 +17,7 @@ interface SearchParams {
 async function getLPs(searchParams: SearchParams): Promise<LPWithAnalysis[]> {
   const supabase = createServiceClient()
 
-  let query = supabase.from('lps').select('*, lp_analyses(*)').eq('status', 'active')
+  let query = supabase.from('lps').select('*, lp_analyses(*)').or('status.eq.active,status.is.null')
 
   if (searchParams.industry) query = query.eq('industry', searchParams.industry)
   if (searchParams.purpose) query = query.eq('purpose', searchParams.purpose)
@@ -37,7 +37,7 @@ async function getLPs(searchParams: SearchParams): Promise<LPWithAnalysis[]> {
 
 async function getLPCount(): Promise<number> {
   const supabase = createServiceClient()
-  const { count } = await supabase.from('lps').select('id', { count: 'exact', head: true }).eq('status', 'active')
+  const { count } = await supabase.from('lps').select('id', { count: 'exact', head: true }).or('status.eq.active,status.is.null')
   return count ?? 0
 }
 
