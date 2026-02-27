@@ -67,27 +67,28 @@ function createSupabaseClient() {
 }
 
 async function captureAndAnalyze(browser, targetUrl) {
-  const page = await browser.newPage()
-  await page.setViewport({ width: 1280, height: 900 })
+  // --- デスクトップ ---
+  const desktopPage = await browser.newPage()
+  await desktopPage.setViewport({ width: 1280, height: 900 })
 
   const navStart = Date.now()
-  await page.goto(targetUrl, {
+  await desktopPage.goto(targetUrl, {
     waitUntil: 'networkidle2',
     timeout: 30000,
   })
   const pageLoadTimeMs = Date.now() - navStart
 
-  const bodyHeight = await page.evaluate(() =>
+  const bodyHeight = await desktopPage.evaluate(() =>
     Math.min(document.body.scrollHeight, 5000)
   )
   const pageHeightRatio = bodyHeight / 900
 
-  await page.setViewport({ width: 1280, height: bodyHeight })
+  await desktopPage.setViewport({ width: 1280, height: bodyHeight })
 
   // DOM解析: ページ構造情報を取得
   let domAnalysis = null
   try {
-    domAnalysis = await page.evaluate(() => {
+    domAnalysis = await desktopPage.evaluate(() => {
       const getText = (el) => el ? el.textContent.trim() : ''
 
       const h1Text = getText(document.querySelector('h1'))
@@ -145,14 +146,28 @@ async function captureAndAnalyze(browser, targetUrl) {
     console.warn('DOM analysis failed:', domErr.message)
   }
 
-  const screenshotBuffer = await page.screenshot({
+  const desktopScreenshotBuffer = await desktopPage.screenshot({
     type: 'webp',
     quality: 85,
     fullPage: false,
   })
+  await desktopPage.close()
 
-  await page.close()
-  return { screenshotBuffer, domAnalysis }
+  // --- モバイル ---
+  const mobilePage = await browser.newPage()
+  await mobilePage.setViewport({ width: 375, height: 812, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+  let mobileScreenshotBuffer = null
+  try {
+    await mobilePage.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 })
+    const mobileBodyHeight = await mobilePage.evaluate(() => Math.min(document.body.scrollHeight, 8000))
+    await mobilePage.setViewport({ width: 375, height: Math.min(mobileBodyHeight, 8000), deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+    mobileScreenshotBuffer = await mobilePage.screenshot({ type: 'webp', quality: 85, fullPage: false })
+  } catch (e) {
+    console.warn(`Mobile page load warning for ${targetUrl}:`, e.message)
+  }
+  await mobilePage.close()
+
+  return { desktopScreenshotBuffer, mobileScreenshotBuffer, domAnalysis }
 }
 
 async function processLP(supabase, r2, targetLpId, targetUrl) {
@@ -163,37 +178,61 @@ async function processLP(supabase, r2, targetLpId, targetUrl) {
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   })
 
-  let screenshotBuffer
+  let desktopScreenshotBuffer
+  let mobileScreenshotBuffer
   let domAnalysis
 
   try {
-    ;({ screenshotBuffer, domAnalysis } = await captureAndAnalyze(browser, targetUrl))
+    ;({ desktopScreenshotBuffer, mobileScreenshotBuffer, domAnalysis } = await captureAndAnalyze(browser, targetUrl))
   } finally {
     await browser.close()
   }
 
-  // R2にアップロード
-  const key = `screenshots/${targetLpId}.webp`
+  const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL
+
+  // デスクトップR2アップロード
+  const desktopKey = `screenshots/${targetLpId}.webp`
   await r2.send(
     new PutObjectCommand({
       Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-      Key: key,
-      Body: screenshotBuffer,
+      Key: desktopKey,
+      Body: desktopScreenshotBuffer,
       ContentType: 'image/webp',
     })
   )
-
-  const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL
   const screenshotUrl = publicUrl
-    ? `${publicUrl}/${key}`
-    : `https://pub-${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.dev/${key}`
+    ? `${publicUrl}/${desktopKey}`
+    : `https://pub-${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.dev/${desktopKey}`
+  console.log(`Desktop screenshot uploaded: ${screenshotUrl}`)
 
-  console.log(`Screenshot uploaded: ${screenshotUrl}`)
+  // モバイルR2アップロード
+  let mobileScreenshotUrl = null
+  if (mobileScreenshotBuffer) {
+    const mobileKey = `screenshots/${targetLpId}_mobile.webp`
+    await r2.send(
+      new PutObjectCommand({
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: mobileKey,
+        Body: mobileScreenshotBuffer,
+        ContentType: 'image/webp',
+      })
+    )
+    mobileScreenshotUrl = publicUrl
+      ? `${publicUrl}/${mobileKey}`
+      : `https://pub-${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.dev/${mobileKey}`
+    console.log(`Mobile screenshot uploaded: ${mobileScreenshotUrl}`)
+  }
 
   // スクリーンショットURLをLPに保存
+  const updateData = {
+    screenshot_url: screenshotUrl,
+    last_checked_at: new Date().toISOString(),
+  }
+  if (mobileScreenshotUrl) updateData.mobile_screenshot_url = mobileScreenshotUrl
+
   const { error: lpError } = await supabase
     .from('lps')
-    .update({ screenshot_url: screenshotUrl, last_checked_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', targetLpId)
 
   if (lpError) {
@@ -248,7 +287,7 @@ async function runBatch() {
   const { data: lps, error } = await supabase
     .from('lps')
     .select('id, url')
-    .is('screenshot_url', null)
+    .or('screenshot_url.is.null,mobile_screenshot_url.is.null')
     .eq('status', 'active')
     .order('created_at', { ascending: true })
 

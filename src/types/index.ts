@@ -12,6 +12,7 @@ export interface LP {
   design_taste: string | null
   target_audience: string | null
   screenshot_url: string | null
+  mobile_screenshot_url: string | null
   first_seen_at: string
   last_checked_at: string | null
   ad_platform: string | null
@@ -27,6 +28,14 @@ export interface LP {
   effectiveness_grade: string | null
   longevity_checked_at: string | null
   cro_checked_at: string | null
+  // LP収集アルゴリズム v2 追加フィールド
+  ad_first_seen_at: string | null
+  ad_last_seen_at: string | null
+  ad_days_active: number | null
+  advertiser_id: string | null
+  ad_keywords: string[] | null
+  has_noindex: boolean | null
+  discovery_source: string | null
 }
 
 export interface CandidateURL {

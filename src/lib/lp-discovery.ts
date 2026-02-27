@@ -164,6 +164,21 @@ function scoreLpHtml(html: string): number {
   const ctaHits = ctaKeywords.filter((k) => lower.includes(k)).length
   score += ctaHits * 6
 
+  // noindex = 広告専用LP（SEOに出したくない高品質LP）
+  const hasNoIndex = /name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(html) ||
+    /content=["'][^"']*noindex[^"']*["'][^>]*name=["']robots["']/i.test(html)
+  if (hasNoIndex) score += 40
+
+  // 外部フォームサービスへのリンク検出（フォームタグ不要のLP）
+  const externalFormDomains = [
+    'formrun.me', 'form.run', 'tayori.com', 'typeform.com',
+    'hubspot.com', 'hsforms.com', 'salesforce.com', 'pardot.com',
+    'marketo.com', 'mailchimp.com', 'kintoneapp.com', 'google.com/forms',
+    'docs.google.com/forms', 'calendly.com', 'lp.formzu.com',
+  ]
+  const hasExternalFormLink = externalFormDomains.some((domain) => lower.includes(domain))
+  if (hasExternalFormLink) score += 25
+
   // ブログ記事・ニュースページ的シグナル（減点）
   if (/<article[\s>]/i.test(html) && /<time[\s>]/i.test(html)) score -= 30
   const articleCount = (html.match(/<article[\s>]/gi) ?? []).length
@@ -184,9 +199,10 @@ function scoreLpHtml(html: string): number {
   if (/class=["'][^"']*byline[^"']*["']/i.test(html)) score -= 20
   if (/class=["'][^"']*author[^"']*["']/i.test(html) && /<time[\s>]/i.test(html)) score -= 20
 
-  // ゲート: フォーム要素がなく CTA も少ない場合はLPではない
-  // ニュース記事やプレスリリースはフォームを持たないため、ここで弾く
-  const hasHardLpSignal = hasForm || hasEmailInput || hasSubmitInput
+  // ゲート: フォーム要素・外部フォームリンクがなく CTA も少ない場合はLPではない
+  // noindex付きのLPはフォームなしのケースがあるため免除
+  const hasHardLpSignal = hasForm || hasEmailInput || hasSubmitInput || hasExternalFormLink
+  if (hasNoIndex && ctaHits >= 2) return score  // noindex + CTA2件以上は確実にLP
   if (!hasHardLpSignal && ctaHits < 4) {
     return 0
   }

@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/nl-issue",
       "schedule": "0 23 * * 4"
+    },
+    {
+      "path": "/api/cron/lp-discover-v2",
+      "schedule": "0 3 * * *"
     }
   ]
 }

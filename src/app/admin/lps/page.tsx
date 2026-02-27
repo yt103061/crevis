@@ -10,6 +10,7 @@ export default function AdminLPsPage() {
   const [lps, setLps] = useState<LPWithAnalysis[]>([])
   const [loading, setLoading] = useState(true)
   const [discovering, setDiscovering] = useState(false)
+  const [discoveringV2, setDiscoveringV2] = useState(false)
 
   // フィルター状態
   const [statusFilter, setStatusFilter] = useState('')
@@ -116,6 +117,21 @@ export default function AdminLPsPage() {
     fetchLPs()
   }
 
+  async function discoverLPsV2() {
+    setDiscoveringV2(true)
+    const res = await fetch('/api/cron/lp-discover-v2', { method: 'GET' })
+    const data = await res.json()
+    setDiscoveringV2(false)
+    if (!res.ok) {
+      alert(data.error ?? 'v2自動発見に失敗しました')
+      return
+    }
+    const results: Array<{ layer: string; discovered: number; inserted: number; activated: number; errors: number }> = data.results ?? []
+    const summary = results.map((r) => `${r.layer}: 発見${r.discovered}件 登録${r.inserted}件 公開${r.activated}件`).join('\n')
+    alert(`AI収集 v2 完了\n${summary || '結果なし'}`)
+    fetchLPs()
+  }
+
   async function reanalyze(id: string) {
     const res = await fetch(`/api/admin/lps/${id}`, {
       method: 'PATCH',
@@ -168,6 +184,13 @@ export default function AdminLPsPage() {
             className="px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
             {discovering ? '収集中...' : 'Webから自動発見'}
+          </button>
+          <button
+            onClick={discoverLPsV2}
+            disabled={discoveringV2}
+            className="px-3 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+          >
+            {discoveringV2 ? '収集中...' : 'AI収集 v2'}
           </button>
           <Link
             href="/admin/lps/new"

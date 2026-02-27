@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase'
@@ -10,6 +9,8 @@ import { Header } from '@/components/public/header'
 import { Badge } from '@/components/ui/badge'
 import { RadarChart } from '@/components/public/radar-chart'
 import { CollectionButton } from '@/components/public/collection-button'
+import { ScreenshotViewer } from '@/components/public/screenshot-viewer'
+import { TakedownButton } from '@/components/public/takedown-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,29 +152,11 @@ export default async function LPDetailPage({ params }: Props) {
           <div className="lg:col-span-2 space-y-5">
             {/* Screenshot */}
             <div className="glass rounded-2xl overflow-hidden animate-fade-in-up">
-              {lp.screenshot_url ? (
-                <div className="relative max-w-[800px] mx-auto w-full">
-                  <Image
-                    src={lp.screenshot_url}
-                    alt={lp.title ?? lp.url}
-                    width={1280}
-                    height={900}
-                    className="w-full h-auto"
-                    priority
-                    placeholder="blur"
-                    blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-                  />
-                </div>
-              ) : (
-                <div className="aspect-[16/9] flex flex-col items-center justify-center gap-3 bg-[#f1f1ee]">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center shimmer">
-                    <svg className="w-8 h-8 text-[#8a8f88]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <span className="text-xs text-[#767b74]">スクリーンショット取得中...</span>
-                </div>
-              )}
+              <ScreenshotViewer
+                desktopUrl={lp.screenshot_url}
+                mobileUrl={lp.mobile_screenshot_url}
+                title={lp.title ?? lp.url}
+              />
             </div>
 
             {/* AI Comments */}
@@ -364,13 +347,8 @@ export default async function LPDetailPage({ params }: Props) {
             </div>
 
             {/* Takedown */}
-            <div className="text-center animate-fade-in stagger-4">
-              <a
-                href={`mailto:info@crevis.jp?subject=削除申請: ${lp.id}`}
-                className="text-xs text-[#8a8f88] hover:text-[#5e625c] transition-colors"
-              >
-                このLPの削除を申請する
-              </a>
+            <div className="animate-fade-in stagger-4">
+              <TakedownButton lpId={lp.id} />
             </div>
           </div>
         </div>
