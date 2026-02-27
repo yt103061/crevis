@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * LPスクリーンショット取得スクリプト
- * 使い方: node scripts/screenshot.js <lp_id> <url>
+ * 使い方:
+ *   単体: node scripts/screenshot.js <lp_id> <url>
+ *   一括: node scripts/screenshot.js --batch   (screenshot_url IS NULL の LP を全件処理)
  * スクリーンショット取得に加え、DOM解析データ（ページ高さ・ロード時間等）も保存する
  */
 
@@ -9,16 +11,126 @@ const puppeteer = require('puppeteer')
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 const { createClient } = require('@supabase/supabase-js')
 
-const lpId = process.argv[2]
-const url = process.argv[3]
+const isBatch = process.argv[2] === '--batch'
+const lpId = !isBatch ? process.argv[2] : null
+const url = !isBatch ? process.argv[3] : null
 
-if (!lpId || !url) {
-  console.error('Usage: node screenshot.js <lp_id> <url>')
+if (!isBatch && (!lpId || !url)) {
+  console.error('Usage:')
+  console.error('  Single: node scripts/screenshot.js <lp_id> <url>')
+  console.error('  Batch:  node scripts/screenshot.js --batch')
   process.exit(1)
 }
 
-async function takeScreenshot() {
-  console.log(`Taking screenshot for LP ${lpId}: ${url}`)
+function createR2Client() {
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    },
+  })
+}
+
+function createSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
+
+async function captureAndAnalyze(browser, targetUrl) {
+  const page = await browser.newPage()
+  await page.setViewport({ width: 1280, height: 900 })
+
+  const navStart = Date.now()
+  await page.goto(targetUrl, {
+    waitUntil: 'networkidle2',
+    timeout: 30000,
+  })
+  const pageLoadTimeMs = Date.now() - navStart
+
+  const bodyHeight = await page.evaluate(() =>
+    Math.min(document.body.scrollHeight, 5000)
+  )
+  const pageHeightRatio = bodyHeight / 900
+
+  await page.setViewport({ width: 1280, height: bodyHeight })
+
+  // DOM解析: ページ構造情報を取得
+  let domAnalysis = null
+  try {
+    domAnalysis = await page.evaluate(() => {
+      const getText = (el) => el ? el.textContent.trim() : ''
+
+      const h1Text = getText(document.querySelector('h1'))
+      const h2Texts = Array.from(document.querySelectorAll('h2'))
+        .map((el) => el.textContent.trim())
+        .filter(Boolean)
+        .slice(0, 10)
+
+      const ctaWords = ['無料', '申し込む', '登録', '始める', '試す', '体験', '問い合わせ', '資料請求',
+        'Start', 'Get Started', 'Sign Up', 'Try', 'Free', 'Download', 'Contact', 'Get', 'Buy']
+      const ctaButtons = []
+      document.querySelectorAll('button, a.btn, a.button, [class*="cta"], input[type="submit"]')
+        .forEach((el) => {
+          const text = el.textContent.trim()
+          if (text && ctaWords.some((w) => text.includes(w))) {
+            ctaButtons.push(text.slice(0, 50))
+          }
+        })
+
+      const forms = document.querySelectorAll('form')
+      const hasMainForm = forms.length > 0
+      let formFieldCount = 0
+      forms.forEach((form) => {
+        formFieldCount += form.querySelectorAll(
+          'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
+        ).length
+      })
+
+      const navLinkCount = document.querySelectorAll('nav a, header a').length
+
+      const bodyText = document.body.innerText || ''
+      const hasSocialProof = /導入企業|導入実績|利用者数|会員数|\d+社|\d+人|customers|companies|users/i.test(bodyText)
+      const hasTestimonials = /お客様の声|導入事例|testimonial|review|★|⭐/i.test(bodyText) ||
+        document.querySelectorAll('[class*="testimonial"], [class*="review"], [class*="voice"]').length > 0
+      const hasFAQ = /よくある質問|FAQ|Q&A|frequently asked/i.test(bodyText) ||
+        document.querySelectorAll('[class*="faq"], [class*="accordion"]').length > 0
+      const hasPricing = /料金|価格|プラン|pricing|plan|\$/i.test(bodyText) ||
+        document.querySelectorAll('[class*="price"], [class*="plan"], [class*="pricing"]').length > 0
+
+      const totalImageCount = document.querySelectorAll('img').length
+      const hasVideo = document.querySelectorAll('video, iframe[src*="youtube"], iframe[src*="vimeo"]').length > 0
+      const totalSections = document.querySelectorAll('section, [class*="section"], [class*="block"]').length
+
+      return {
+        h1Text, h2Texts,
+        ctaButtons: ctaButtons.slice(0, 10),
+        hasMainForm, formFieldCount, navLinkCount,
+        hasSocialProof, hasTestimonials, hasFAQ, hasPricing,
+        totalImageCount, hasVideo, totalSections,
+      }
+    })
+    domAnalysis.pageLoadTimeMs = pageLoadTimeMs
+    domAnalysis.pageHeightRatio = Math.round(pageHeightRatio * 100) / 100
+  } catch (domErr) {
+    console.warn('DOM analysis failed:', domErr.message)
+  }
+
+  const screenshotBuffer = await page.screenshot({
+    type: 'webp',
+    quality: 85,
+    fullPage: false,
+  })
+
+  await page.close()
+  return { screenshotBuffer, domAnalysis }
+}
+
+async function processLP(supabase, r2, targetLpId, targetUrl) {
+  console.log(`Processing LP ${targetLpId}: ${targetUrl}`)
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -26,154 +138,41 @@ async function takeScreenshot() {
   })
 
   let screenshotBuffer
-  let domAnalysis = null
+  let domAnalysis
 
   try {
-    const page = await browser.newPage()
-    await page.setViewport({ width: 1280, height: 900 })
-
-    const navStart = Date.now()
-    await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 30000,
-    })
-    const pageLoadTimeMs = Date.now() - navStart
-
-    const bodyHeight = await page.evaluate(() =>
-      Math.min(document.body.scrollHeight, 5000)
-    )
-    const pageHeightRatio = bodyHeight / 900
-
-    await page.setViewport({ width: 1280, height: bodyHeight })
-
-    // DOM解析: ページ構造情報を取得
-    try {
-      domAnalysis = await page.evaluate(() => {
-        const getText = (el) => el ? el.textContent.trim() : ''
-
-        // 基本情報
-        const title = document.title || ''
-        const h1Text = getText(document.querySelector('h1'))
-        const h2Texts = Array.from(document.querySelectorAll('h2'))
-          .map((el) => el.textContent.trim())
-          .filter(Boolean)
-          .slice(0, 10)
-
-        // CTA検出
-        const ctaWords = ['無料', '申し込む', '登録', '始める', '試す', '体験', '問い合わせ', '資料請求',
-          'Start', 'Get Started', 'Sign Up', 'Try', 'Free', 'Download', 'Contact', 'Get', 'Buy']
-        const ctaButtons = []
-        document.querySelectorAll('button, a.btn, a.button, [class*="cta"], input[type="submit"]')
-          .forEach((el) => {
-            const text = el.textContent.trim()
-            if (text && ctaWords.some((w) => text.includes(w))) {
-              ctaButtons.push(text.slice(0, 50))
-            }
-          })
-
-        // フォーム
-        const forms = document.querySelectorAll('form')
-        const hasMainForm = forms.length > 0
-        let formFieldCount = 0
-        forms.forEach((form) => {
-          formFieldCount += form.querySelectorAll(
-            'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
-          ).length
-        })
-
-        // ナビゲーション
-        const navLinkCount = document.querySelectorAll('nav a, header a').length
-
-        // 信頼シグナル
-        const bodyText = document.body.innerText || ''
-        const hasSocialProof = /導入企業|導入実績|利用者数|会員数|\d+社|\d+人|customers|companies|users/i.test(bodyText)
-        const hasTestimonials = /お客様の声|導入事例|testimonial|review|★|⭐/i.test(bodyText) ||
-          document.querySelectorAll('[class*="testimonial"], [class*="review"], [class*="voice"]').length > 0
-        const hasFAQ = /よくある質問|FAQ|Q&A|frequently asked/i.test(bodyText) ||
-          document.querySelectorAll('[class*="faq"], [class*="accordion"]').length > 0
-        const hasPricing = /料金|価格|プラン|pricing|plan|\$/i.test(bodyText) ||
-          document.querySelectorAll('[class*="price"], [class*="plan"], [class*="pricing"]').length > 0
-
-        // 画像・動画
-        const totalImageCount = document.querySelectorAll('img').length
-        const hasVideo = document.querySelectorAll('video, iframe[src*="youtube"], iframe[src*="vimeo"]').length > 0
-
-        // セクション数
-        const totalSections = document.querySelectorAll('section, [class*="section"], [class*="block"]').length
-
-        return {
-          h1Text,
-          h2Texts,
-          ctaButtons: ctaButtons.slice(0, 10),
-          hasMainForm,
-          formFieldCount,
-          navLinkCount,
-          hasSocialProof,
-          hasTestimonials,
-          hasFAQ,
-          hasPricing,
-          totalImageCount,
-          hasVideo,
-          totalSections,
-        }
-      })
-
-      domAnalysis.pageLoadTimeMs = pageLoadTimeMs
-      domAnalysis.pageHeightRatio = Math.round(pageHeightRatio * 100) / 100
-    } catch (domErr) {
-      console.warn('DOM analysis failed:', domErr.message)
-    }
-
-    screenshotBuffer = await page.screenshot({
-      type: 'webp',
-      quality: 85,
-      fullPage: false,
-    })
+    ;({ screenshotBuffer, domAnalysis } = await captureAndAnalyze(browser, targetUrl))
   } finally {
     await browser.close()
   }
 
   // R2にアップロード
-  const r2 = new S3Client({
-    region: 'auto',
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-    },
-  })
-
-  const key = `screenshots/${lpId}.webp`
+  const key = `screenshots/${targetLpId}.webp`
   await r2.send(
     new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
       Key: key,
       Body: screenshotBuffer,
       ContentType: 'image/webp',
     })
   )
 
-  const publicUrl = process.env.R2_PUBLIC_URL
+  const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL
   const screenshotUrl = publicUrl
     ? `${publicUrl}/${key}`
-    : `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${key}`
+    : `https://pub-${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.dev/${key}`
 
   console.log(`Screenshot uploaded: ${screenshotUrl}`)
-
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
 
   // スクリーンショットURLをLPに保存
   const { error: lpError } = await supabase
     .from('lps')
     .update({ screenshot_url: screenshotUrl, last_checked_at: new Date().toISOString() })
-    .eq('id', lpId)
+    .eq('id', targetLpId)
 
   if (lpError) {
-    console.error('Failed to update Supabase lps:', lpError)
-    process.exit(1)
+    console.error(`Failed to update lps for ${targetLpId}:`, lpError)
+    return false
   }
 
   // DOM解析結果をlp_page_featuresにupsert
@@ -183,7 +182,7 @@ async function takeScreenshot() {
         .from('lp_page_features')
         .upsert(
           {
-            lp_id: lpId,
+            lp_id: targetLpId,
             h1_text: domAnalysis.h1Text,
             h2_texts: domAnalysis.h2Texts,
             cta_buttons: domAnalysis.ctaButtons,
@@ -203,19 +202,76 @@ async function takeScreenshot() {
           { onConflict: 'lp_id' }
         )
       if (featError) {
-        console.warn('Failed to upsert lp_page_features:', featError.message)
+        console.warn(`Failed to upsert lp_page_features for ${targetLpId}:`, featError.message)
       } else {
-        console.log('DOM analysis saved to lp_page_features')
+        console.log(`DOM analysis saved for ${targetLpId}`)
       }
     } catch (e) {
-      console.warn('lp_page_features upsert error:', e.message)
+      console.warn(`lp_page_features upsert error for ${targetLpId}:`, e.message)
     }
   }
 
-  console.log(`Successfully updated LP ${lpId} with screenshot URL`)
+  console.log(`Successfully updated LP ${targetLpId}`)
+  return true
 }
 
-takeScreenshot().catch((err) => {
-  console.error('Screenshot failed:', err)
-  process.exit(1)
-})
+async function runBatch() {
+  const supabase = createSupabaseClient()
+  const r2 = createR2Client()
+
+  const { data: lps, error } = await supabase
+    .from('lps')
+    .select('id, url')
+    .is('screenshot_url', null)
+    .eq('status', 'active')
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Failed to fetch LPs:', error)
+    process.exit(1)
+  }
+
+  if (!lps || lps.length === 0) {
+    console.log('No LPs without screenshots found.')
+    return
+  }
+
+  console.log(`Found ${lps.length} LPs without screenshots.`)
+
+  let success = 0
+  let failure = 0
+
+  for (const lp of lps) {
+    try {
+      const ok = await processLP(supabase, r2, lp.id, lp.url)
+      if (ok) success++
+      else failure++
+    } catch (err) {
+      console.error(`Error processing LP ${lp.id}:`, err.message)
+      failure++
+    }
+    // 連続アクセスを避けるため少し待機
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+  }
+
+  console.log(`Batch complete: ${success} succeeded, ${failure} failed`)
+}
+
+async function runSingle() {
+  const supabase = createSupabaseClient()
+  const r2 = createR2Client()
+  const ok = await processLP(supabase, r2, lpId, url)
+  if (!ok) process.exit(1)
+}
+
+if (isBatch) {
+  runBatch().catch((err) => {
+    console.error('Batch failed:', err)
+    process.exit(1)
+  })
+} else {
+  runSingle().catch((err) => {
+    console.error('Screenshot failed:', err)
+    process.exit(1)
+  })
+}

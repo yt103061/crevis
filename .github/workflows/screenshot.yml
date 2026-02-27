@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       lp_id:
-        description: 'LP ID in Supabase'
-        required: true
+        description: 'LP ID in Supabase (leave blank for batch mode)'
+        required: false
       url:
-        description: 'Target URL'
-        required: true
+        description: 'Target URL (leave blank for batch mode)'
+        required: false
 
 jobs:
   screenshot:
@@ -21,11 +21,16 @@ jobs:
       - run: npm install puppeteer @aws-sdk/client-s3 @supabase/supabase-js
       - name: Take screenshot and upload to R2
         env:
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          CLOUDFLARE_R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}
+          CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_R2_BUCKET_NAME: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}
+          CLOUDFLARE_R2_PUBLIC_URL: ${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/screenshot.js ${{ inputs.lp_id }} "${{ inputs.url }}"
+        run: |
+          if [ -n "${{ inputs.lp_id }}" ] && [ -n "${{ inputs.url }}" ]; then
+            node scripts/screenshot.js "${{ inputs.lp_id }}" "${{ inputs.url }}"
+          else
+            node scripts/screenshot.js --batch
+          fi
