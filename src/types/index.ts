@@ -1,5 +1,7 @@
 export type LPStatus = 'active' | 'archived' | 'takedown'
 
+export type PlanType = 'free' | 'reader' | 'pro' | 'team'
+
 export interface LP {
   id: string
   url: string
@@ -13,6 +15,36 @@ export interface LP {
   ad_platform: string | null
   status: LPStatus
   created_at: string
+  lp_confidence_score: number | null
+  is_likely_lp: boolean | null
+}
+
+export interface LPPageFeatures {
+  isLikelyLP: boolean
+  lpConfidenceScore: number
+  totalSections: number
+  pageHeightRatio: number
+  navLinkCount: number
+  externalLinkCount: number
+  internalLinkCount: number
+  ctaButtons: string[]
+  formFieldCount: number
+  hasMainForm: boolean
+  h1Text: string
+  h2Texts: string[]
+  metaDescription: string
+  metaTitle: string
+  mainCopySnippets: string[]
+  hasSocialProof: boolean
+  hasTestimonials: boolean
+  hasFAQ: boolean
+  hasPricing: boolean
+  hasNoIndex: boolean
+  ogType: string
+  canonicalUrl: string
+  pageLoadTimeMs: number
+  totalImageCount: number
+  hasVideo: boolean
 }
 
 export interface LPAnalysis {
@@ -51,6 +83,7 @@ export interface NLSource {
   active: boolean
   last_fetched_at: string | null
   created_at: string
+  scrape_selector: string | null
 }
 
 export interface NLArticle {
@@ -63,8 +96,12 @@ export interface NLArticle {
   translated_title_ja: string | null
   key_insights: string[] | null
   relevance_score: number | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'auto_rejected'
   fetched_at: string
+  evidence_level: 'high' | 'medium' | 'low' | null
+  actionable_tips: string[] | null
+  content_length: number | null
+  extraction_method: 'rss' | 'scrape' | 'api' | null
 }
 
 export interface NewsletterIssue {
@@ -92,7 +129,7 @@ export interface NewsletterSubscriber {
 export interface Profile {
   id: string
   email: string | null
-  plan: 'free' | 'pro' | 'team'
+  plan: PlanType
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
   created_at: string
@@ -104,6 +141,10 @@ export interface LPAnalysisInput {
   purpose: string
   target_audience: string
   days_active: number
+  /** 事前取得済みの生HTML。渡すと analyzeLP 内での再フェッチをスキップする */
+  rawHtml?: string
+  /** cheerioで抽出したページ構造情報 */
+  pageFeatures?: LPPageFeatures
 }
 
 export interface LPAnalysisOutput {
@@ -116,6 +157,12 @@ export interface LPAnalysisOutput {
   improvement_points: string[]
   why_it_works: string
   target_match: string
+  /** LLMがページ内容から推論した業界 */
+  inferred_industry?: string
+  /** LLMがページ内容から推論した目的（資料請求・無料トライアル等） */
+  inferred_purpose?: string
+  /** LLMがページ内容から推論したターゲットオーディエンス */
+  inferred_target_audience?: string
 }
 
 export interface ArticleInput {
@@ -128,4 +175,6 @@ export interface ArticleOutput {
   summary_ja: string
   key_insights: string[]
   relevance_score: number
+  evidence_level: 'high' | 'medium' | 'low'
+  actionable_tips: string[]
 }

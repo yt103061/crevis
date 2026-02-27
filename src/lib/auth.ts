@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/auth-helpers-nextjs'
+import type { PlanType } from '@/types'
+import { createServiceClient } from '@/lib/supabase'
 
 function isSupabaseAuthConfigured() {
   return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -65,4 +67,35 @@ export async function requireAdminAuth() {
   }
 
   return user
+}
+
+// セッション cookie を JWT 検証して認証済みユーザーを返す（安全なサーバーサイド認証）
+export async function getAuthUser() {
+  const supabase = createServerSupabaseClient()
+  if (!supabase) return null
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return null
+  return user
+}
+
+// ユーザーのプランを取得
+export async function getUserPlan(userId: string): Promise<PlanType> {
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .from('profiles')
+    .select('plan')
+    .eq('id', userId)
+    .single()
+  return (data?.plan as PlanType) ?? 'free'
+}
+
+// NL全文閲覧権限（reader, pro, team）
+export function canAccessFullNewsletter(plan: PlanType): boolean {
+  return plan === 'reader' || plan === 'pro' || plan === 'team'
+}
+
+// LP全機能権限（pro, team）
+export function canAccessFullLP(plan: PlanType): boolean {
+  return plan === 'pro' || plan === 'team'
 }

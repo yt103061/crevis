@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/auth'
-import {
-  autoApprovePendingArticles,
-  createWeeklyIssueDraftFromApproved,
-  fetchArticlesFromSources,
-} from '@/lib/newsletter-automation'
+import { runNewsletterFetch } from '@/lib/newsletter/fetch'
+import { autoApprovePendingArticles, createIssueFromApprovedArticles } from '@/lib/newsletter/issue-automation'
 
 function hasAutomationSecret(request: NextRequest) {
   const secret = process.env.AUTOMATION_CRON_SECRET
@@ -25,26 +22,15 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({})) as {
-    fetchLimitPerSource?: number
     autoApproveThreshold?: number
-    minApprovedArticles?: number
-    issueArticleLimit?: number
-    forceCreateIssue?: boolean
   }
 
-  const fetchLimitPerSource = Math.min(Math.max(body.fetchLimitPerSource ?? 10, 1), 30)
-  const autoApproveThreshold = Math.min(Math.max(body.autoApproveThreshold ?? 75, 0), 100)
-  const minApprovedArticles = Math.min(Math.max(body.minApprovedArticles ?? 3, 1), 10)
-  const issueArticleLimit = Math.min(Math.max(body.issueArticleLimit ?? 5, 1), 10)
+  const autoApproveThreshold = Math.min(Math.max(body.autoApproveThreshold ?? 70, 0), 100)
 
   try {
-    const fetchResults = await fetchArticlesFromSources(fetchLimitPerSource)
+    const fetchResults = await runNewsletterFetch()
     const autoApproved = await autoApprovePendingArticles(autoApproveThreshold)
-    const issueDraft = await createWeeklyIssueDraftFromApproved({
-      minApprovedArticles,
-      articleLimit: issueArticleLimit,
-      force: !!body.forceCreateIssue,
-    })
+    const issueDraft = await createIssueFromApprovedArticles()
 
     return NextResponse.json({
       ok: true,

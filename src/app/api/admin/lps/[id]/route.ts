@@ -3,6 +3,32 @@ import { createServiceClient } from '@/lib/supabase'
 import { requireAdminAuth } from '@/lib/auth'
 import { analyzeLP } from '@/lib/ai-client'
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await requireAdminAuth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createServiceClient({ requireServiceRole: true })
+  const { data: lp, error } = await supabase
+    .from('lps')
+    .select('*, lp_analyses(*)')
+    .eq('id', params.id)
+    .single()
+
+  if (error || !lp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // ページ特徴データを取得
+  const { data: features } = await supabase
+    .from('lp_page_features')
+    .select('*')
+    .eq('lp_id', params.id)
+    .maybeSingle()
+
+  return NextResponse.json({ lp, features })
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

@@ -84,6 +84,30 @@ export default async function AdminDashboard() {
         </div>
       )}
 
+      {stats.pendingArticles > 0 && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <span className="text-amber-700 font-bold text-sm">{stats.pendingArticles}</span>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-900 mb-1">未処理記事が{stats.pendingArticles}件あります</h3>
+              <p className="text-sm text-amber-700 mb-3">
+                RSSから収集した記事を承認・却下してください。承認後に号管理ページでニュースレターを作成できます。
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <a href="/admin/newsletter/articles" className="inline-flex items-center px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700">
+                  記事を処理する（全件承認も可）
+                </a>
+                <a href="/admin/newsletter/issues" className="inline-flex items-center px-3 py-1.5 border border-amber-300 text-amber-700 text-sm font-medium rounded-md hover:bg-amber-100">
+                  号管理へ
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <QuickAction
           title="LP登録"
@@ -97,6 +121,23 @@ export default async function AdminDashboard() {
           href="/admin/newsletter/articles"
           buttonLabel="記事一覧を見る"
         />
+      </div>
+
+      <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+        <h3 className="font-semibold text-gray-700 mb-3 text-sm">ニュースレター配信の流れ</h3>
+        <ol className="space-y-1.5">
+          {[
+            { step: '1', text: '記事一覧で「記事を収集」', href: '/admin/newsletter/articles' },
+            { step: '2', text: '記事を「承認」または「却下」（全件承認も可能）', href: '/admin/newsletter/articles' },
+            { step: '3', text: '号管理で「自動化を実行」またはドラフトを手動作成', href: '/admin/newsletter/issues' },
+            { step: '4', text: 'ドラフト → 「準備完了」→ 「配信」で購読者へ送信', href: '/admin/newsletter/issues' },
+          ].map(({ step, text, href }) => (
+            <li key={step} className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center shrink-0">{step}</span>
+              <a href={href} className="hover:text-indigo-600 hover:underline">{text}</a>
+            </li>
+          ))}
+        </ol>
       </div>
 
       <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
